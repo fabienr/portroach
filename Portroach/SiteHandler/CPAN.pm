@@ -100,7 +100,7 @@ sub GetFiles
 	$metacpan = 'https://fastapi.metacpan.org/v1/release/';
 
 	# Strip all the digits at the end to keep the stem of the module.
-	if ($port->{distname} =~ /(.*?)-(\d+)/) {
+	if ($port->{distname} =~ /(.*?)-(v?\d+)/) {
 	    $module = $1;
 	}
 
