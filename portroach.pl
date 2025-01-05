@@ -1394,11 +1394,14 @@ sub GenerateHTML
 				$row->{newver} = '';
 				$row->{newurl} = '';
 			} else {
-				given($row->{method}) {
-					when(METHOD_LIST)   { $row->{method} = 'L' }
-					when(METHOD_GUESS)  { $row->{method} = 'G' }
-					when(METHOD_HANDLER){ $row->{method} = 'S' }
-					default             { $row->{method} = ''  }
+				if ($row->{method} eq METHOD_LIST) {
+					$row->{method} = 'L';
+				} elsif ($row->{method} eq METHOD_GUESS) {
+					$row->{method} = 'G';
+				} elsif ($row->{method} eq METHOD_HANDLER) {
+					$row->{method} = 'S';
+				} else {
+					$row->{method} = '';
 				}
 			}
 
