@@ -219,6 +219,10 @@ sub BuildPort
 	$name     = fullpkgpathtoport($fullpkgpath);
 
 	$distname = $ports[2];
+	# get rid of version/epoch markers
+	$distname =~ s/v[0-9]+$//;
+	$distname =~ s/p[0-9]+$//;
+
 	foreach my $file (split /\s+/, $ports[3]) {
 	    $file =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
 	    push @distfiles, $file;
