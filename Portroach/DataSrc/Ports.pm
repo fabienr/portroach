@@ -114,6 +114,8 @@ sub BuildDB
 
 	$dbh = connect_db();
 
+	prepare_sql($sdbh, \%ssths, qw(create_view));
+	$ssths{create_view}->execute or die DBI->errstr;
 	prepare_sql($sdbh, \%ssths, qw(sqlports_count_ports sqlports_fullpkgpaths_by_maintainer));
 
 	if ($settings{restrict_maintainer}) {
