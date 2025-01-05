@@ -112,12 +112,12 @@ sub GetFiles
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
-	    my %entries = %{decode_json($resp->decoded_content)};
+	    my $entries = decode_json($resp->decoded_content);
 
 	    # 'entries' is a singleton array, where the first element
 	    # contains hashes with the actual entries
-	    foreach my $e (keys(%{$entries{entries}})) {
-		my $files_collection_link = $entries{entries}[$e]->{files_collection_link};
+	    foreach my $e (@{$entries->{entries}}) {
+		my $files_collection_link = $e->{files_collection_link};
 
 		# Now that we have the files_collection_link, retrieve that so
 		# we can properly build the files array.
@@ -126,10 +126,10 @@ sub GetFiles
 		my $fcl_resp = $fcl_ua->request(HTTP::Request->new(GET => $files_collection_link));
 
 		if ($fcl_resp->is_success) {
-		    my %entries_fcl = %{decode_json($fcl_resp->decoded_content)};
+		    my $entries_fcl = decode_json($fcl_resp->decoded_content);
 
-		    foreach my $ef (keys(%{$entries_fcl{entries}})) {
-			my $self_link = $entries_fcl{entries}[$ef]->{self_link};
+		    foreach my $ef (@{$entries_fcl->{entries}}) {
+			my $self_link = $ef->{self_link};
 			push @$files, $self_link;
 		    }
 		} else {
