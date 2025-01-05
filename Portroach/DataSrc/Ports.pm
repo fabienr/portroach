@@ -305,7 +305,7 @@ sub BuildPort
 		}
 	}
 
-	info(1, $fullpkgpath, "($n_port out of $total_ports)");
+	info(1, $fullpkgpath, "($n_port/$total_ports)");
 
 	$ps->AddPort({
 	    'name'        => $name,
