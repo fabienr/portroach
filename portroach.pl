@@ -1460,7 +1460,7 @@ sub GenerateHTML
 	}
 
 	my $assets_dir = "$settings{templates_dir}/$settings{output_type}/assets/";
-	return unless (-d $assets_dir);
+	return 1 unless (-d $assets_dir);
 
 	print "Copying assets...\n";
 	emptydir("$settings{html_data_dir}/assets/");
@@ -1468,6 +1468,8 @@ sub GenerateHTML
 	foreach my $asset (glob("$assets_dir/*")) {
 		copy($asset, "$settings{html_data_dir}/assets") or die $!;
 	}
+
+	return 1;
 }
 
 
