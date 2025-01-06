@@ -308,8 +308,9 @@ sub Check
 	if ($nofork) {
 		prepare_sql($dbh, \%sths,
 			qw(portdata_setchecked portdata_setnewver
-			   sitedata_select sitedata_failure sitedata_success
-			   sitedata_initliecount sitedata_decliecount)
+			   portdata_setmethod sitedata_select sitedata_failure
+			   sitedata_success sitedata_initliecount
+			   sitedata_decliecount)
 		);
 	}
 
@@ -355,9 +356,14 @@ sub Check
 				$dbh = connect_db(1);
 
 				prepare_sql($dbh, \%sths,
-					qw(portdata_setchecked portdata_setnewver
-					   sitedata_select sitedata_failure sitedata_success
-					   sitedata_initliecount sitedata_decliecount)
+					qw(portdata_setchecked
+					   portdata_setnewver
+					   portdata_setmethod
+					   sitedata_select
+					   sitedata_failure
+					   sitedata_success
+					   sitedata_initliecount
+					   sitedata_decliecount)
 				);
 
 				while (my $port = pop @workblock) {
@@ -822,6 +828,12 @@ sub VersionCheck
 		# Make note of working site
 		$sths->{sitedata_success}->execute($site->host);
 
+		if ($method == METHOD_HANDLER && !@files) {
+			$sths->{portdata_setmethod}->execute(
+				$method,
+				$port->{id}
+			) unless ($settings{precious_data});
+		}
 		next if (!@files);
 
 		my $file = FindNewestFile($port, $site, \@files);
@@ -838,6 +850,11 @@ sub VersionCheck
 			) unless ($settings{precious_data});
 
 			last;
+		} elsif ($old_found) {
+			$sths->{portdata_setmethod}->execute(
+				$method,
+				$port->{id}
+			) unless ($settings{precious_data});
 		}
 
 		last if ($old_found && $settings{oldfound_enable});
@@ -1101,6 +1118,8 @@ sub FindNewestFile
 			$new_found = $port->{newver};
 			$old_found = $port->{ver};
 			$poss_match = $port->{newver};
+		} elsif (defined $port->{ver}) {
+			$old_found = $port->{ver};
 		}
 	}
 
@@ -1317,9 +1336,9 @@ sub GenerateHTML
 		die "Static output is no longer supported\n";
 	} else {
 		print "Generating dynamic index.html\n";
-		$template->applyglobal(\%outdata);
+	$template->applyglobal(\%outdata);
 		$template->output("index.html");
-		$template->reset;
+	$template->reset;
 	}
 
 	if ($settings{output_type} =~ /(json|dynamic)/) {
@@ -1358,7 +1377,7 @@ sub GenerateHTML
 		open(my $fh, '>>', "$settings{html_data_dir}/json/totals.json") or die $!;
 		print $fh JSON::encode_json(\%totals);
 		close($fh);
-		undef @results;
+	undef @results;
 	}
 
 	# Point static index.html at the default sorted index
@@ -1430,7 +1449,7 @@ sub GenerateHTML
 		# We don't want this polluting the data
 		# when the next template uses it.
 		delete $outdata{maintainer};
-	}
+		}
 
 	$template = undef;
 

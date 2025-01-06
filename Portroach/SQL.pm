@@ -187,6 +187,11 @@ $sql{portdata_setnewver} =
 	         discovered = CURRENT_TIMESTAMP
 	   WHERE id = ?);
 
+$sql{portdata_setmethod} =
+	q(UPDATE portdata
+	     SET method = ?
+	   WHERE id = ?);
+
 $sql{sitedata_exists} =
 	q(SELECT COUNT(*)
 	    FROM sitedata
