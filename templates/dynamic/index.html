@@ -8,12 +8,14 @@
 	<link href="assets/portroach.css" rel="stylesheet" type="text/css"/>
 </head>
 
-<body ng-controller="OverviewController as overview" ng-init="predicate='maintainer'">
+<body ng-controller="OverviewController as overview" ng-init="index='%%(index)';predicate='cat'">
 
 <div class="header">
   portroach - OpenBSD Ports Distfile Scanner
   <div class="menu">
     <a href="index.html">Home</a>
+    <a href="sites.html">Sites</a>
+    <a href="maintainers.html">Maintainers</a>
     <a href="restricted-ports.html">Restricted</a>
   </div>
 </div>
@@ -27,13 +29,24 @@
   <p class="summary">
     Summary:<br />
     Total distfiles: {{ overview.summary.total_ports }}<br />
-    Outdated distfiles: {{ overview.summary.total_outdated }} ({{ overview.summary.outdated_percentage }}%)
+    Outdated distfiles: {{ overview.summary.total_outdated }} ({{ overview.summary.outdated_percentage }}%)<br />
+    Maintainers: {{ overview.summary.total_maintainers }}
+  </p>
+  <p>
+    Description for the columns:
+    <ul>
+      <li>G = file was found by sending incremental version guesses to server.</li>
+      <li>L = file was found in FTP or HTTP directory index</li>
+      <li>X = port is ignored - new versions are not reported.</li>
+      <li>S = file was found with dedicated site handler.</li>
+      <li>? = unknow, file not found.</li>
+    </ul>
   </p>
 </div>
 
 <form class="filter-box">
   <fieldset class="filter-box">
-    Filter Maintainer: <input tabindex="1" ng-model="search.maintainer">
+    Filter Category: <input tabindex="1" ng-model="search.cat">
     Outdated only? <input tabindex="2" type="checkbox" ng-model="overview.onlyOutdated">
   </fieldset>
 </form>
@@ -41,14 +54,27 @@
 <table class="results" cellspacing="1" cellpadding="2" >
 	<tbody id="results">
 		<tr class="resultshead">
-			<td><a class="sortable" title="Sort by maintainer" href="" ng-click="predicate = 'maintainer'; reverse=false">Maintainer</a></td>
+			<td><a class="sortable" title="Sort by category" href="" ng-click="predicate = 'cat'; reverse=false">Category</a></td>
 			<td><a class="sortable" title="Sort by total distfiles" href="" ng-click="predicate = 'total'; reverse=!reverse">Total distfiles</a></td>
 			<td><a class="sortable" title="Sort by distfiles (absolute)" href="" ng-click="predicate = 'withnewdistfile'; reverse=!reverse">New Distfile(s)</a></td>
 			<td><a class="sortable" title="Sort by distfiles (relative)" href="" ng-click="predicate = 'percentage'; reverse=!reverse">% Out of Date</a></td>
+      <td><a class="sortable" title="Sort by distfiles (guessed)" href="" ng-click="predicate = 'guessed'; reverse=!reverse">G</a></td>
+      <td><a class="sortable" title="Sort by distfiles (indexed)" href="" ng-click="predicate = 'indexed'; reverse=!reverse">L</a></td>
+      <td><a class="sortable" title="Sort by distfiles (ignored)" href="" ng-click="predicate = 'ignored'; reverse=!reverse">X</a></td>
+      <td><a class="sortable" title="Sort by distfiles (handled)" href="" ng-click="predicate = 'handled'; reverse=!reverse">S</a></td>
+      <td><a class="sortable" title="Sort by distfiles (unknow)" href="" ng-click="predicate = 'unknow'; reverse=!reverse">?</a></td>
 		</tr>
 		<tr ng-show="loading"><td colspan="4">Loading...</td></tr>
-        <tr ng-cloak class="resultsrow" ng-show="overview.showOutdated(maintainer, overview.onlyOutdated)" ng-repeat="maintainer in overview.maintainers | filter:search | orderBy:predicate:reverse">
-            <td><a href="{{ maintainer.maintainer }}.html">{{ overview.stripEmail(maintainer.maintainer) }}</a></td><td>{{ maintainer.total }}</td><td>{{ maintainer.withnewdistfile }}</td><td>{{ maintainer.percentage }}%</td>
+        <tr ng-cloak class="resultsrow" ng-show="overview.showOutdated(category, overview.onlyOutdated)" ng-repeat="category in overview.results | filter:search | orderBy:predicate:reverse">
+            <td><a href="{{ overview.stripCat(category.cat) }}.html">{{ category.cat }}</a></td>
+            <td>{{ category.total }}</td>
+            <td>{{ category.withnewdistfile }}</td>
+            <td>{{ category.percentage }}%</td>
+            <td>{{ category.guessed }}</td>
+            <td>{{ category.indexed }}</td>
+            <td>{{ category.ignored }}</td>
+            <td>{{ category.handled }}</td>
+            <td>{{ category.unknow }}</td>
         </tr>
 	</tbody>
 </table>

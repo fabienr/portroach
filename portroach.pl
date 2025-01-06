@@ -1298,22 +1298,29 @@ sub robotsallowed
 
 sub GenerateHTML
 {
-	my (%sths, %outdata, @time, @assets, @results, $dbh, $sth, $template);
+	my (%sths, %outdata, %totals, @time, @assets, @results,
+	    $dbh, $sth, $template);
+
+	if ($settings{output_type} eq 'static') {
+		die "Static output is no longer supported\n";
+	}
 
 	$dbh = connect_db();
 
-	prepare_sql($dbh, \%sths,
-		qw(portdata_genresults portdata_selectall portdata_selectall_limited)
+	prepare_sql($dbh, \%sths, qw(
+	    portdata_gencategories
+	    portdata_genmaintainers
+	    portdata_gensites
+	    portdata_selectall_cat
+	    portdata_selectall_site
+	    portdata_selectall_maintainer
+	    portdata_selectall_limited)
 	);
 
-	if ($Portroach::SQL::sql{portdata_genresults_init}) {
-		# SQLite needs to create the temp. table
-		# in a separate statement.
-		$dbh->do($Portroach::SQL::sql{portdata_genresults_init});
-	}
-
 	print "Organising results...\n";
-	$sths{portdata_genresults}->execute;
+	$sths{portdata_genmaintainers}->execute;
+	$sths{portdata_gencategories}->execute;
+	$sths{portdata_gensites}->execute;
 
 	emptydir($settings{html_data_dir});
 	emptydir("$settings{html_data_dir}/json/") if ($settings{output_type} =~ /(json|dynamic)/);
@@ -1327,24 +1334,74 @@ sub GenerateHTML
 	$outdata{appver}  = APPVER;
 	$outdata{author}  = AUTHOR;
 
-	$template = Portroach::Template->new('index.html')
-		or die "index.html template not found!\n";
+	# Produce indexes pages
 
-	# Produce indices, sorted by each header
+	print "Generating dynamic maintainers.html\n";
 
-	if ($settings{output_type} eq 'static') {
-		die "Static output is no longer supported\n";
-	} else {
-		print "Generating dynamic index.html\n";
+	$template = Portroach::Template->new('maintainers.html')
+		or die "maintainers.html template not found!\n";
+	$outdata{index} = 'maintainers';
 	$template->applyglobal(\%outdata);
-		$template->output("index.html");
+	$template->output("maintainers.html");
 	$template->reset;
-	}
 
 	if ($settings{output_type} =~ /(json|dynamic)/) {
-		print "Writing results in JSON format...\n";
+		my ($total, $outdated, $maintainers, $sth);
+		$sth = $dbh->prepare("SELECT * FROM maintainers") or die DBI->errstr;
+		$sth->execute;
+
+		while (my $row = $sth->fetchrow_hashref) {
+			if ($row->{maintainer}) {
+				$row->{maintainer} =~ s/\>[\s\,]+([^\s])/\>& $1/g;
+				$row->{maintainer} =~ s/\<.*?\>//g;
+				$row->{maintainer} =~ s/\s+/ /g;
+				$row->{maintainer} =~ s/\s$//g;
+			}
+			$row->{percentage} = 0 + sprintf('%.2f', $row->{percentage})
+				if ($row->{percentage});
+			$row->{total} += 0
+			        if ($row->{total});
+			$row->{withnewdistfile} += 0
+			        if ($row->{withnewdistfile});
+			push(@results, $row);
+			$maintainers++;
+			$total += $row->{total};
+			$outdated += $row->{withnewdistfile};
+		}
+
+		$sth->finish;
+
+		if ($total == 0) {
+		    die("No maintainers found; database might not have been built previously?");
+		}
+
+		$totals{'results'} = \@results;
+		$totals{'summary'} = {
+			'total_ports'         => $total,
+			'total_outdated'      => $outdated,
+			'total_maintainers'   => $maintainers,
+			'outdated_percentage' => sprintf('%.2f', ($outdated/$total)*100),
+		};
+
+		open(my $fh, '>>', "$settings{html_data_dir}/json/maintainers.json") or die $!;
+		print $fh JSON::encode_json(\%totals);
+		close($fh);
+		undef $totals{'results'};
+	}
+	undef @results;
+
+	print "Generating dynamic index.html\n";
+
+	$template = Portroach::Template->new('index.html')
+		or die "index.html template not found!\n";
+	$outdata{index} = 'categories';
+	$template->applyglobal(\%outdata);
+	$template->output("index.html");
+	$template->reset;
+
+	if ($settings{output_type} =~ /(json|dynamic)/) {
 		my ($total, $outdated, $sth);
-		$sth = $dbh->prepare("SELECT * FROM results") or die DBI->errstr;
+		$sth = $dbh->prepare("SELECT * FROM categories") or die DBI->errstr;
 		$sth->execute;
 
 		while (my $row = $sth->fetchrow_hashref) {
@@ -1354,6 +1411,16 @@ sub GenerateHTML
 			        if ($row->{total});
 			$row->{withnewdistfile} += 0
 			        if ($row->{withnewdistfile});
+			$row->{unknow} += 0
+			        if ($row->{unknow});
+			$row->{guessed} += 0
+			        if ($row->{guessed});
+			$row->{indexed} += 0
+			        if ($row->{indexed});
+			$row->{handled} += 0
+			        if ($row->{handled});
+			$row->{ignored} += 0
+			        if ($row->{ignored});
 			push(@results, $row);
 			$total += $row->{total};
 			$outdated += $row->{withnewdistfile};
@@ -1362,52 +1429,88 @@ sub GenerateHTML
 		$sth->finish;
 
 		if ($total == 0) {
-		    die("No results found; database might not have been built previously?");
+		    die("No categories found; database might not have been built previously?");
 		}
 
-		my %totals;
+		if ($totals{'summary'}{'total_ports'} != $total) {
+		    die("total ports mismatch between categories & results");
+		}
+		if ($totals{'summary'}{'total_outdated'} != $outdated) {
+		    die("total outdated mismatch between categories & results");
+		}
 
 		$totals{'results'} = \@results;
-		$totals{'summary'} = {
-			'total_ports'         => $total,
-			'total_outdated'      => $outdated,
-			'outdated_percentage' => sprintf('%.2f', ($outdated/$total)*100),
-		};
-
-		open(my $fh, '>>', "$settings{html_data_dir}/json/totals.json") or die $!;
+		open(my $fh, '>>', "$settings{html_data_dir}/json/categories.json") or die $!;
 		print $fh JSON::encode_json(\%totals);
 		close($fh);
+		undef $totals{'results'};
+	}
 	undef @results;
-	}
-
-	# Point static index.html at the default sorted index
-	unless ($settings{output_type} =~ /(json|dynamic)/) {
-		symlink(
-			"index-$settings{default_html_sort}.html",
-			"$settings{html_data_dir}/index.html"
-		);
-	}
 
 	$template = undef;
 
-	# Produce maintainer pages
+	print "Generating dynamic sites.html\n";
 
-	print "Creating maintainer pages...\n";
+	$template = Portroach::Template->new('sites.html')
+		or die "sites.html template not found!\n";
+	$outdata{index} = 'sites';
+	$template->applyglobal(\%outdata);
+	$template->output("sites.html");
+	$template->reset;
 
-	$template = Portroach::Template->new('maintainer.html')
-		or die "maintainer.html template not found!\n";
+	if ($settings{output_type} =~ /(json|dynamic)/) {
+		my ($total, $sth);
+		$sth = $dbh->prepare("SELECT * FROM sites") or die DBI->errstr;
+		$sth->execute;
 
-	$sth = $dbh->prepare('SELECT DISTINCT maintainer FROM results')
+		while (my $row = $sth->fetchrow_hashref) {
+			$row->{percentage} = 0 + sprintf('%.2f', $row->{percentage})
+				if ($row->{percentage});
+			$row->{total} += 0
+			        if ($row->{total});
+			$row->{withnewdistfile} += 0
+			        if ($row->{withnewdistfile});
+			$total += $row->{total};
+			push(@results, $row);
+		}
+
+		$sth->finish;
+
+		if ($total == 0) {
+		    die("No sites found; database might not have been built previously?");
+		}
+
+		$totals{'results'} = \@results;
+		open(my $fh, '>>', "$settings{html_data_dir}/json/sites.json") or die $!;
+		print $fh JSON::encode_json(\%totals);
+		close($fh);
+		undef $totals{'results'};
+	}
+
+	undef @results;
+	undef %totals;
+
+	$template = undef;
+
+	# Produce ports pages
+
+	print "Creating category pages...\n";
+
+	$template = Portroach::Template->new('ports.html')
+		or die "ports.html template not found!\n";
+
+	$sth = $dbh->prepare('SELECT DISTINCT cat FROM categories')
 		or die DBI->errstr;
 	$sth->execute;
 
 	while (my ($addr) = $sth->fetchrow_array)
 	{
-		$outdata{maintainer} = $addr;
+		$outdata{index} = $addr;
 		$template->applyglobal(\%outdata);
 
-		$sths{portdata_selectall}->execute($addr);
-		while (my $row = $sths{portdata_selectall}->fetchrow_hashref) {
+		$sths{portdata_selectall_cat}->execute($addr);
+		while (my $row = 
+		    $sths{portdata_selectall_cat}->fetchrow_hashref) {
 			if ($row->{ignore}) {
 				$row->{method} = 'X';
 				$row->{newver} = '';
@@ -1436,21 +1539,137 @@ sub GenerateHTML
 			$template->pushrow($row);
 			push(@results, $row);
 		}
-		$template->output("$outdata{maintainer}.html");
+		$outdata{index} =~ tr|/|_|;
+		$template->output("$outdata{index}.html");
 		$template->reset;
 
 		if ($settings{output_type} =~ /(json|dynamic)/) {
-		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{maintainer}.json") or warn "$outdata{maintainer}: $!";
+		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json") or warn "$outdata{index}: $!";
 		    print $fh JSON::encode_json(\@results);
 		    close($fh);
 		    undef @results;
 		}
+	}
 
-		# We don't want this polluting the data
-		# when the next template uses it.
-		delete $outdata{maintainer};
+	$template = undef;
+
+	print "Creating maintainer pages...\n";
+
+	$template = Portroach::Template->new('ports.html')
+		or die "ports.html template not found!\n";
+
+	$sth = $dbh->prepare('SELECT DISTINCT maintainer FROM maintainers')
+		or die DBI->errstr;
+	$sth->execute;
+
+	while (my ($addr) = $sth->fetchrow_array)
+	{
+		$outdata{index} = $addr;
+		$outdata{index} =~ s/\>[\s\,]+([^\s])/\>& $1/g;
+		$outdata{index} =~ s/\<.*?\>//g;
+		$outdata{index} =~ s/\s+/ /g;
+		$outdata{index} =~ s/\s$//g;
+		$template->applyglobal(\%outdata);
+
+		$sths{portdata_selectall_maintainer}->execute($addr);
+		while (my $row =
+		    $sths{portdata_selectall_maintainer}->fetchrow_hashref) {
+			if ($row->{ignore}) {
+				$row->{method} = 'X';
+				$row->{newver} = '';
+				$row->{newurl} = '';
+			} else {
+				if ($row->{method} eq METHOD_LIST) {
+					$row->{method} = 'L';
+				} elsif ($row->{method} eq METHOD_GUESS) {
+					$row->{method} = 'G';
+				} elsif ($row->{method} eq METHOD_HANDLER) {
+					$row->{method} = 'S';
+				} else {
+					$row->{method} = '';
+				}
+			}
+
+			if ($row->{newver} && ($row->{ver} ne $row->{newver})) {
+				$row->{newdistfile} = 'updated';
+			} else {
+				next if ($settings{hide_unchanged});
+				$row->{newdistfile} = '';
+			}
+			$row->{updated} =~ s/:\d\d(?:\.\d+)?$/ $settings{local_timezone}/;
+			$row->{checked} =~ s/:\d\d(?:\.\d+)?$/ $settings{local_timezone}/;
+
+			$template->pushrow($row);
+			push(@results, $row);
 		}
+		$outdata{index} =~ tr| |_|;
+		$template->output("$outdata{index}.html");
+		$template->reset;
 
+		if ($settings{output_type} =~ /(json|dynamic)/) {
+		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json") or warn "$outdata{index}: $!";
+		    print $fh JSON::encode_json(\@results);
+		    close($fh);
+		    undef @results;
+		}
+	}
+	$template = undef;
+
+	print "Creating site pages...\n";
+
+	$template = Portroach::Template->new('ports.html')
+		or die "ports.html template not found!\n";
+
+	$sth = $dbh->prepare('SELECT DISTINCT host FROM sites')
+		or die DBI->errstr;
+	$sth->execute;
+
+	while (my ($addr) = $sth->fetchrow_array)
+	{
+		$outdata{index} = $addr;
+		$template->applyglobal(\%outdata);
+
+		$sths{portdata_selectall_site}->execute($addr);
+		while (my $row =
+		    $sths{portdata_selectall_site}->fetchrow_hashref) {
+			if ($row->{ignore}) {
+				$row->{method} = 'X';
+				$row->{newver} = '';
+				$row->{newurl} = '';
+			} else {
+				if ($row->{method} eq METHOD_LIST) {
+					$row->{method} = 'L';
+				} elsif ($row->{method} eq METHOD_GUESS) {
+					$row->{method} = 'G';
+				} elsif ($row->{method} eq METHOD_HANDLER) {
+					$row->{method} = 'S';
+				} else {
+					$row->{method} = '';
+				}
+			}
+
+			if ($row->{newver} && ($row->{ver} ne $row->{newver})) {
+				$row->{newdistfile} = 'updated';
+			} else {
+				next if ($settings{hide_unchanged});
+				$row->{newdistfile} = '';
+			}
+			$row->{updated} =~ s/:\d\d(?:\.\d+)?$/ $settings{local_timezone}/;
+			$row->{checked} =~ s/:\d\d(?:\.\d+)?$/ $settings{local_timezone}/;
+
+			$template->pushrow($row);
+			push(@results, $row);
+		}
+		$template->output("$outdata{index}.html");
+		$template->reset;
+
+		if ($settings{output_type} =~ /(json|dynamic)/) {
+		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json") or warn "$outdata{index}: $!";
+		    print $fh JSON::encode_json(\@results);
+		    close($fh);
+		    undef @results;
+		}
+	}
 	$template = undef;
 
 	print "Creating restricted ports (portconfig) page...\n";
@@ -1459,6 +1678,7 @@ sub GenerateHTML
 		or die "restricted-ports.html template not found!\n";
 
 	$sths{portdata_selectall_limited}->execute;
+	$outdata{index} = 'restricted-ports';
 	$template->applyglobal(\%outdata);
 
 	while (my $row = $sths{portdata_selectall_limited}->fetchrow_hashref) {

@@ -59,7 +59,7 @@ $$sql{sitedata_setrobots} =
 
 # GenerateHTML
 
-$$sql{portdata_genresults} =
+$$sql{portdata_genmaintainers} =
 	q(CREATE TEMP TABLE maintainers AS
 	  SELECT lower(maintainer) AS maintainer,
 	         total,
@@ -73,6 +73,40 @@ $$sql{portdata_genresults} =
 	         COUNT(newver != ver) AS withnewdistfile
 	    FROM portdata
 	GROUP BY maintainer
+	));
+
+$$sql{portdata_gencategories} =
+	q(CREATE TEMP TABLE categories AS
+	  SELECT lower(cat) AS cat,
+	         total,
+	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
+	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0)
+	           AS FLOAT) AS percentage
+
+	    FROM (
+	  SELECT cat,
+	         COUNT(maintainer) AS total,
+	         COUNT(newver != ver) AS withnewdistfile
+	    FROM portdata
+	GROUP BY cat
+	));
+
+$$sql{portdata_gensites} =
+	q(CREATE TEMP TABLE sites AS
+	  SELECT host,
+	         total,
+	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
+	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0)
+	           AS FLOAT) AS percentage
+
+	    FROM (
+	  SELECT sitedata.host,
+	         COUNT(maintainer) AS total,
+	         COUNT(newver != ver) AS withnewdistfile
+	    FROM portdata
+	    INNER JOIN sitedata
+	      ON lower(mastersites) LIKE '%' || sitedata.host || '%'
+	    GROUP BY sitedata.host
 	));
 
 _transformsql();

@@ -59,13 +59,13 @@ $$sql{sitedata_setrobots} =
 
 # GenerateHTML
 
-$$sql{portdata_genresults} =
+$$sql{portdata_genmaintainers} =
 	q(SELECT maintainer,
 	         total,
 	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
 	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0) AS FLOAT)
 	           AS percentage
-	    INTO TEMP results
+	    INTO TEMP maintainers
 	
 	    FROM (
 	  SELECT lower(maintainer) AS maintainer,
@@ -73,6 +73,50 @@ $$sql{portdata_genresults} =
 	         COUNT(newver != ver) AS withnewdistfile
 	    FROM portdata
 	GROUP BY lower(maintainer)
+	)
+	      AS pd1
+	);
+
+$$sql{portdata_gencategories} =
+	q(SELECT cat,
+	         total,
+	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
+	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0) AS FLOAT)
+	           AS percentage,
+	         unknow, guessed, indexed, handled, ignored
+	    INTO TEMP categories
+	
+	    FROM (
+	  SELECT cat,
+	         COUNT(maintainer) AS total,
+	         COUNT(newver != ver) AS withnewdistfile,
+	         COUNT(CASE WHEN (method=0 AND ignore=False) THEN 1 END) AS unknow,
+	         COUNT(CASE WHEN method=1 THEN 1 END) AS guessed,
+	         COUNT(CASE WHEN method=2 THEN 1 END) AS indexed,
+	         COUNT(CASE WHEN method=3 THEN 1 END) AS handled,
+	         COUNT(CASE WHEN ignore=True THEN 1 END) AS ignored
+	    FROM portdata
+	GROUP BY cat
+	)
+	      AS pd1
+	);
+
+
+$$sql{portdata_gensites} =
+	q(SELECT host,
+	         total,
+	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
+	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0) AS FLOAT)
+	           AS percentage
+	    INTO TEMP sites
+	
+	    FROM (
+	  SELECT sitedata.host,
+	         COUNT(maintainer) AS total,
+	         COUNT(newver != ver) AS withnewdistfile
+	    FROM portdata
+	    INNER JOIN sitedata ON mastersites ILIKE '%' || sitedata.host || '%'
+	    GROUP BY sitedata.host
 	)
 	      AS pd1
 	);

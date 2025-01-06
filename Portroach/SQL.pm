@@ -242,12 +242,28 @@ $sql{portdata_uncheck} =
 
 # GenerateHTML
 
-#$sql{portdata_genresults}
+#$sql{portdata_genmaintainers}
 
-$sql{portdata_selectall} =
+#$sql{portdata_gencategories}
+
+#$sql{portdata_gensites}
+
+$sql{portdata_selectall_maintainer} =
 	q(SELECT *
 	    FROM portdata
 	   WHERE lower(maintainer) = lower(?)
+	ORDER BY cat,name);
+
+$sql{portdata_selectall_cat} =
+	q(SELECT *
+	    FROM portdata
+	   WHERE lower(cat) = lower(?)
+	ORDER BY cat,name);
+
+$sql{portdata_selectall_site} =
+	q(SELECT *
+	    FROM portdata
+	   WHERE lower(mastersites) LIKE '%' || (?) || '%'
 	ORDER BY cat,name);
 
 $sql{portdata_selectall_limited} =
