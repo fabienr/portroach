@@ -72,13 +72,6 @@ CREATE TABLE stats (
 	`val` text
 );
 
-CREATE TABLE results (
-	`maintainer` text,
-	`total` integer,
-	`withnewdistfile` integer,
-	`percentage` float
-);
-
 INSERT
   INTO portroach (dbver)
 VALUES (2015072601);

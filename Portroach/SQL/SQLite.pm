@@ -59,19 +59,14 @@ $$sql{sitedata_setrobots} =
 
 # GenerateHTML
 
-$$sql{portdata_genresults_init} =
-	q(DELETE FROM results);
-
 $$sql{portdata_genresults} =
-	q(INSERT
-	    INTO results
-	
+	q(CREATE TEMP TABLE maintainers AS
 	  SELECT lower(maintainer) AS maintainer,
 	         total,
 	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
-	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0) AS FLOAT)
-	           AS percentage
-	
+	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0)
+	           AS FLOAT) AS percentage
+
 	    FROM (
 	  SELECT maintainer,
 	         COUNT(maintainer) AS total,

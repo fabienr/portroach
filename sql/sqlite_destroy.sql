@@ -13,4 +13,3 @@ DROP TABLE stats;
 DROP TABLE maildata;
 DROP TABLE allocators;
 DROP TABLE systemdata;
-DROP TABLE results;
