@@ -83,7 +83,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /^http:\/\/downloads\.sourceforge\.net/);
+	return ($url =~ /^https?:\/\/downloads\.sourceforge\.net/);
 }
 
 
