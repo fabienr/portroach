@@ -73,7 +73,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /https:\/\/pypi\.io\//);
+	return ($url =~ /https:\/\/(files\.pythonhosted\.org|pypi\.io)\//);
 }
 
 
