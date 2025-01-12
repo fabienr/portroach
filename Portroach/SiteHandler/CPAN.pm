@@ -69,7 +69,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	my $cpan = '(.*?\/CPAN|[a-z\.]*\.(meta)?cpan\.org)';
+	my $cpan = '(.*?\/CPAN|[a-z\.]*\.(meta)?(cpan|perl)\.org)';
 	return ($url =~ /(https?|ftp):\/\/$cpan\/modules\//);
 }
 
