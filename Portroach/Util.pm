@@ -59,6 +59,7 @@ our @EXPORT = qw(
 	&extractsuffix
 	&tobasepkgpath
 	&fullpkgpathtoport
+	&regress
 	&info
 	&randstr
 	&arrexists
@@ -636,6 +637,37 @@ sub extractsuffix
     foreach my $sufx (@suffixes) {
 	return $sufx if $distname =~ m/$sufx/;
     }
+}
+
+#------------------------------------------------------------------------------
+# Func: regress()
+# Desc: Print either 'REGRESS' on STDERR or 'FIX' using info(0,...) depending on
+#       regress setting.
+#
+# Args: @str - Array of message parts to chop and format.
+#       $msg - Message to print unformatted after other parts.
+#
+# Retn: n/a
+#------------------------------------------------------------------------------
+
+sub regress
+{
+	my @items = (@_);
+	my ($str, $msg);
+
+	$msg = pop (@items);
+	if ($settings{regress}) {
+		$msg = "FIX, " . $msg;
+		info(0, @items, $msg);
+		return;
+	}
+
+	$msg = "REGRESS, " . $msg;
+	foreach (@items) {
+		$str .= ' ' if ($str);
+		$str .= $_ . ':';
+	}
+	print STDERR "$str $msg\n";
 }
 
 #------------------------------------------------------------------------------
