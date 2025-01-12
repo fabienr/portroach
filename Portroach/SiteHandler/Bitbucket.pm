@@ -18,10 +18,8 @@
 package Portroach::SiteHandler::Bitbucket;
 
 use JSON qw(decode_json);
-use LWP::UserAgent;
 
-use Portroach::Const;
-use Portroach::Config;
+use Portroach::Util;
 
 use strict;
 
@@ -33,8 +31,6 @@ require 5.006;
 #------------------------------------------------------------------------------
 
 push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
-
-our %settings;
 
 
 #------------------------------------------------------------------------------
@@ -104,15 +100,15 @@ sub GetFiles
 	    $accountname = $1;
 	    $repo_slug = $2;
 	} else {
-	    _debug("Failed to match accountname/repo_slug in $url");
+	    print STDERR "$port->{fullpkgpath}: $url, "
+	        . "failed to match accountname/repo_slug\n";
 	    return 0;
 	}
 
 	$query = $api . $accountname . '/' . $repo_slug . '/downloads';
 
-	_debug("GET $query");
-	$ua = LWP::UserAgent->new;
-	$ua->agent(USER_AGENT);
+	debug(__PACKAGE__, $port, "GET $query");
+	$ua = $ua = lwp_useragent();
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
@@ -122,30 +118,12 @@ sub GetFiles
 		    push(@$files, $dl->{name});
 	    }
 	} else {
-	    _debug("GET failed: " . $resp->code);
+	    debug(__PACKAGE__, $port, strchop($query, $60)
+	        . ": $resp->status_line");
 	    return 0;
 	}
 
 	return 1;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: _debug()
-# Desc: Print a debug message.
-#
-# Args: $msg - Message.
-#
-# Retn: n/a
-#------------------------------------------------------------------------------
-
-sub _debug
-{
-	my ($msg) = @_;
-
-	$msg = '' if (!$msg);
-
-	print STDERR "(" . __PACKAGE__ . ") $msg\n" if ($settings{debug});
 }
 
 1;

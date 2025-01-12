@@ -17,10 +17,7 @@
 
 package Portroach::SiteHandler::Pear;
 
-use LWP::UserAgent;
-
-use Portroach::Const;
-use Portroach::Config;
+use Portroach::Util;
 
 use strict;
 
@@ -32,8 +29,6 @@ require 5.006;
 #------------------------------------------------------------------------------
 
 push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
-
-our %settings;
 
 
 #------------------------------------------------------------------------------
@@ -107,9 +102,8 @@ sub GetFiles
 
 	$query = $pear_host . lc($package) . '/latest.txt';
 
-	_debug("GET $query");
-	$ua = LWP::UserAgent->new;
-	$ua->agent(USER_AGENT);
+	debug(__PACKAGE__, $port, "GET $query");
+	$ua = lwp_useragent();
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
@@ -117,30 +111,12 @@ sub GetFiles
 	    my $dl = "http://download.pear.php.net/package/" . $package . "-" . $latest . ".tgz";
 	    push @$files, $dl;
 	} else {
-	    _debug("GET failed: " . $resp->code);
+	    debug(__PACKAGE__, $port, strchop($query, $60)
+	        . ": $resp->status_line");
 	    return 0;
 	}
 
 	return 1;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: _debug()
-# Desc: Print a debug message.
-#
-# Args: $msg - Message.
-#
-# Retn: n/a
-#------------------------------------------------------------------------------
-
-sub _debug
-{
-	my ($msg) = @_;
-
-	$msg = '' if (!$msg);
-
-	print STDERR "(" . __PACKAGE__ . ") $msg\n" if ($settings{debug});
 }
 
 1;

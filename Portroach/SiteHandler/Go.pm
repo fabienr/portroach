@@ -18,10 +18,8 @@
 package Portroach::SiteHandler::Go;
 
 use JSON qw(decode_json);
-use LWP::UserAgent;
 
-use Portroach::Const;
-use Portroach::Config;
+use Portroach::Util;
 
 use strict;
 
@@ -33,8 +31,6 @@ require 5.006;
 #------------------------------------------------------------------------------
 
 push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
-
-our %settings;
 
 
 #------------------------------------------------------------------------------
@@ -104,47 +100,32 @@ sub GetFiles
 	$query = $url;
 	$query =~ s/\@v\//\@latest/;
 
-	_debug("GET $query");
-	$ua = LWP::UserAgent->new;
-	$ua->agent(USER_AGENT);
+	debug(__PACKAGE__, $port, "GET $query");
+	$ua = lwp_useragent();
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
 	    my ($json, $version);
 
-    	    $json = decode_json($resp->decoded_content);
+	    $json = decode_json($resp->decoded_content);
 	    $version = $json->{Version};
-	    next unless $version;
+	    unless ($version) {
+	        print STDERR "$port->{fullpkgpath}: $query, "
+		    . "invalid json, no Version\n";
+	        return 0;
+	    }
 
 	    $port->{newver} = $version;
 	    $version =~ s/v//;
 
 	    push(@$files, "$dist-${version}.zip");
 	} else {
-	    _debug("GET failed: " . $resp->code);
+	    debug(__PACKAGE__, $port, strchop($query, $60)
+	        . ": $resp->status_line");
 	    return 0;
 	}
 
 	return 1;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: _debug()
-# Desc: Print a debug message.
-#
-# Args: $msg - Message.
-#
-# Retn: n/a
-#------------------------------------------------------------------------------
-
-sub _debug
-{
-	my ($msg) = @_;
-
-	$msg = '' if (!$msg);
-
-	print STDERR "(" . __PACKAGE__ . ") $msg\n" if ($settings{debug});
 }
 
 1;

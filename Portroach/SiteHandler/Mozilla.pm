@@ -27,10 +27,7 @@
 
 package Portroach::SiteHandler::Mozilla;
 
-use LWP::UserAgent;
-
-use Portroach::Const;
-use Portroach::Config;
+use Portroach::Util;
 
 use strict;
 
@@ -42,8 +39,6 @@ require 5.006;
 #------------------------------------------------------------------------------
 
 push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
-
-our %settings;
 
 
 #------------------------------------------------------------------------------
@@ -103,55 +98,36 @@ sub GetFiles
 {
 	my $self = shift;
 
-	my ($url, $port, $files) = @_;
+	my ($query, $port, $files) = @_;
 	my ($v, $ua, $resp);
 	# remove .source from ver
 	# check for esr and replace with latest accordingly
 	$v = $port->{ver};
 	$v =~ s/\.source//;
 	# seamonkey doesnt have latest symlinks
-	if ($url =~ /seamonkey/) {
+	if ($query =~ /seamonkey/) {
 		$v =~ /^(\d)\.(\d+)/;
 		my $r = "$1.".($2+1);
-		$url =~ s/$v/$r/;
+		$query =~ s/$v/$r/;
 	} elsif ($port->{ver} =~ /esr/) {
-		$url =~ s/$v/latest-esr/;
+		$query =~ s/$v/latest-esr/;
 	} else {
-		$url =~ s/$v/latest/;
+		$query =~ s/$v/latest/;
 	}
-	_debug("GET $url");
-	$ua = LWP::UserAgent->new;
-	$ua->agent(USER_AGENT);
-	$resp = $ua->request(HTTP::Request->new(GET => $url));
+	debug(__PACKAGE__, $port, "GET $query");
+	$ua = lwp_useragent();
+	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
 	    $resp->decoded_content =~ /href="([\w\d\.-]+\.source\.tar\.(bz2|xz))"/;
-	    _debug("FOUND $url$1");
-	    push(@$files, "$url$1");
+	    push(@$files, "$query$1");
 	} else {
-	    _debug("GET failed: " . $resp->code);
+	    debug(__PACKAGE__, $port, strchop($query, $60)
+	        . ": $resp->status_line");
+	    return 0;
 	}
 
 	return 1;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: _debug()
-# Desc: Print a debug message.
-#
-# Args: $msg - Message.
-#
-# Retn: n/a
-#------------------------------------------------------------------------------
-
-sub _debug
-{
-	my ($msg) = @_;
-
-	$msg = '' if (!$msg);
-
-	print STDERR "(" . __PACKAGE__ . ") $msg\n" if ($settings{debug});
 }
 
 1;

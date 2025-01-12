@@ -18,10 +18,8 @@
 package Portroach::SiteHandler::CPAN;
 
 use JSON qw(decode_json);
-use LWP::UserAgent;
 
-use Portroach::Const;
-use Portroach::Config;
+use Portroach::Util;
 
 use strict;
 
@@ -33,8 +31,6 @@ require 5.006;
 #------------------------------------------------------------------------------
 
 push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
-
-our %settings;
 
 
 #------------------------------------------------------------------------------
@@ -106,42 +102,28 @@ sub GetFiles
 
 	$query = $metacpan . $module;
 
-	_debug("GET $query");
-	$ua = LWP::UserAgent->new;
-	$ua->agent(USER_AGENT);
+	debug(__PACKAGE__, $port, "GET $query");
+	$ua = lwp_useragent();
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
-    	    my $json = decode_json($resp->decoded_content);
-	    next if $json->{timed_out};
-
-	    next unless $json->{version};
+	    my $json = decode_json($resp->decoded_content);
+	    if ($json->{timed_out}) {
+	        print STDERR "$port->{fullpkgpath}: $query, CPAN timed_out\n";
+	        return 0;
+	    }
+	    unless ($json->{version}) {
+	        print STDERR "$port->{fullpkgpath}: $query, CPAN no version\n";
+	        return 0;
+	    }
 	    push(@$files, $json->{download_url});
 	} else {
-	    _debug("GET failed: " . $resp->code);
+	    debug(__PACKAGE__, $port, strchop($query, $60)
+	        . ": $resp->status_line");
 	    return 0;
 	}
 
 	return 1;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: _debug()
-# Desc: Print a debug message.
-#
-# Args: $msg - Message.
-#
-# Retn: n/a
-#------------------------------------------------------------------------------
-
-sub _debug
-{
-	my ($msg) = @_;
-
-	$msg = '' if (!$msg);
-
-	print STDERR "(" . __PACKAGE__ . ") $msg\n" if ($settings{debug});
 }
 
 1;

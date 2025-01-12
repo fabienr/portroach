@@ -18,10 +18,8 @@
 package Portroach::SiteHandler::Launchpad;
 
 use JSON qw(decode_json);
-use LWP::UserAgent;
 
-use Portroach::Const;
-use Portroach::Config;
+use Portroach::Util;
 
 use strict;
 
@@ -33,8 +31,6 @@ require 5.006;
 #------------------------------------------------------------------------------
 
 push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
-
-our %settings;
 
 
 #------------------------------------------------------------------------------
@@ -106,9 +102,8 @@ sub GetFiles
 
 	$query = $lp . $project . "/releases";
 
-	_debug("GET $query");
-	$ua = LWP::UserAgent->new;
-	$ua->agent(USER_AGENT);
+	debug(__PACKAGE__, $port, "GET $query");
+	$ua = lwp_useragent();
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
@@ -117,51 +112,31 @@ sub GetFiles
 	    # 'entries' is a singleton array, where the first element
 	    # contains hashes with the actual entries
 	    foreach my $e (@{$entries->{entries}}) {
-		my $files_collection_link = $e->{files_collection_link};
+		$query = $e->{files_collection_link};
 
 		# Now that we have the files_collection_link, retrieve that so
 		# we can properly build the files array.
-		my $fcl_ua = LWP::UserAgent->new;
-		$fcl_ua->agent(USER_AGENT);
-		my $fcl_resp = $fcl_ua->request(HTTP::Request->new(GET => $files_collection_link));
+		$resp = $ua->request(HTTP::Request->new(GET => $query));
 
-		if ($fcl_resp->is_success) {
-		    my $entries_fcl = decode_json($fcl_resp->decoded_content);
+		if ($resp->is_success) {
+		    my $entries_fcl = decode_json($resp->decoded_content);
 
 		    foreach my $ef (@{$entries_fcl->{entries}}) {
-			my $self_link = $ef->{self_link};
-			push @$files, $self_link;
+			push @$files, $ef->{self_link};
 		    }
 		} else {
-		    _debug("GET failed: " . $fcl_resp);
+		    debug(__PACKAGE__, $port, strchop($query, $60)
+		        . ": $resp->status_line");
 		    return 0;
 		}
 	    }
 	} else {
-	    _debug("GET failed: " . $resp->code);
+	    debug(__PACKAGE__, $port, strchop($query, $60)
+	        . ": $resp->status_line");
 	    return 0;
 	}
 
 	return 1;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: _debug()
-# Desc: Print a debug message.
-#
-# Args: $msg - Message.
-#
-# Retn: n/a
-#------------------------------------------------------------------------------
-
-sub _debug
-{
-	my ($msg) = @_;
-
-	$msg = '' if (!$msg);
-
-	print STDERR "(" . __PACKAGE__ . ") $msg\n" if ($settings{debug});
 }
 
 1;

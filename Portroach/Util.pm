@@ -61,10 +61,12 @@ our @EXPORT = qw(
 	&fullpkgpathtoport
 	&regress
 	&info
+	&debug
 	&randstr
 	&arrexists
 	&wantport
 	&primarycategory
+	&lwp_useragent
 	&uri_filename
 	&uri_lastdir
 	&getdbver
@@ -703,6 +705,29 @@ sub info
 	print "$str $msg\n";
 }
 
+#------------------------------------------------------------------------------
+# Func: debug()
+# Desc: Print a debug message.
+#
+# Args: $package - Prefix message with "($package), ", usually __PACKAGE__.
+#       $port - Prefix message with "$port->{fullpkgpath}: " if defined.
+#       $msg - Message.
+#
+# Retn: n/a
+#------------------------------------------------------------------------------
+
+sub debug
+{
+	return unless ($settings{debug});
+	my $package = shift;
+	my $port = shift;
+	my ($msg) = @_;
+	return if (!$msg);
+	my $debug = "($package) ";
+	$debug .= $port->{fullpkgpath} . ': ' if ($port);
+	$debug .= $msg;
+	print STDERR "$debug\n";
+}
 
 #------------------------------------------------------------------------------
 # Func: randstr()
@@ -830,6 +855,23 @@ sub primarycategory
     my $categories = shift;
     my @category = split(/ /, $categories);
     return @category[0];
+}
+
+#------------------------------------------------------------------------------
+# Func: useragent()
+# Desc: Return LWP::UserAgent with default settings.
+#
+# Args: n/a
+#
+# Retn: $ua - LWP::UserAgent.
+#------------------------------------------------------------------------------
+
+sub lwp_useragent
+{
+	my $ua = LWP::UserAgent->new;
+	$ua->agent(USER_AGENT);
+	$ua->timeout($settings{http_timeout});
+	return $ua;
 }
 
 #------------------------------------------------------------------------------

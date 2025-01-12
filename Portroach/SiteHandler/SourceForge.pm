@@ -28,10 +28,8 @@
 package Portroach::SiteHandler::SourceForge;
 
 use XML::Feed;
-use LWP::UserAgent;
 
-use Portroach::Const;
-use Portroach::Config;
+use Portroach::Util;
 
 use strict;
 
@@ -43,8 +41,6 @@ require 5.006;
 #------------------------------------------------------------------------------
 
 push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
-
-our %settings;
 
 
 #------------------------------------------------------------------------------
@@ -107,26 +103,36 @@ sub GetFiles
 	my ($url, $port, $files) = @_;
 
 	if ($url =~ /downloads\.sourceforge\.net\/sourceforge\/([^\/]*)\//) {
-		my ($rsspage, $projname, $ua, $response, $xpath, $items);
+		my ($query, $projname, $ua, $resp, $xpath, $items);
 
 		$projname = $1;
 
 		# Find the RSS feed for this project.
-		$rsspage = 'http://sourceforge.net/projects/' . $projname . '/rss';
+		$query = 'http://sourceforge.net/projects/'
+		    . $projname . '/rss';
 
-		_debug("GET $rsspage");
-		$ua = LWP::UserAgent->new;
-		$ua->agent(USER_AGENT);
-		$ua->timeout($settings{http_timeout});
+		debug(__PACKAGE__, $port, "GET $query");
+		$ua = lwp_useragent();
+		$resp = $ua->get($query);
 
-		$response = $ua->get($rsspage);
-
-		if (!$response->is_success || $response->status_line !~ /^2/) {
-			_debug('GET failed: ' . $response->status_line);
+		if (!$resp->is_success || $resp->status_line !~ /^2/) {
+			debug(__PACKAGE__, $port, strchop($query, $60)
+			    . ": $resp->status_line");
 			return 0;
 		}
 
-		my $feed = XML::Feed->parse(\$response->content);
+		my $feed = XML::Feed->parse(\$resp->content);
+		unless ($feed) {
+			print STDERR "$port->{fullpkgpath}: $query, "
+			    . "invalid feed, " . XML::Feed->errstr . "\n";
+			return 0;
+		}
+		unless ($feed->entries) {
+			print STDERR "$port->{fullpkgpath}: $query, "
+			    . "invalid feed, no entries\n";
+			return 0;
+		}
+
 		foreach my $item ($feed->entries) {
 			my ($file, $url);
 
@@ -138,32 +144,13 @@ sub GetFiles
 			# Note this file.
 			push @$files, $file;
 		}
-
-		_debug('Found ' . scalar @$files . ' files');
 	} else {
+		print STDERR "$port->{fullpkgpath}: $url, "
+		    . "no projname found in url\n";
 		return 0;
 	}
 
 	return 1;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: _debug()
-# Desc: Print a debug message.
-#
-# Args: $msg - Message.
-#
-# Retn: n/a
-#------------------------------------------------------------------------------
-
-sub _debug
-{
-	my ($msg) = @_;
-
-	$msg = '' if (!$msg);
-
-	print STDERR "(" . __PACKAGE__ . ") $msg\n" if ($settings{debug});
 }
 
 1;
