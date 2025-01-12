@@ -1137,17 +1137,17 @@ sub connect_db
 			$settings{db_user},
 			$settings{db_pass}
 		) or die DBI->errstr;
+		Portroach::SQL->RegisterHacks($dbh);
 	} else {
 		$dbh = DBI->connect_cached(
 			$settings{db_connstr},
 			$settings{db_user},
 			$settings{db_pass}
 		) or die DBI->errstr;
-
+		Portroach::SQL->RegisterHacks($dbh)
+		    unless ($g_dbh);
 		$g_dbh = $dbh; # Keep handle alive
 	}
-
-	Portroach::SQL->RegisterHacks($dbh);
 
 	return $dbh;
 }
