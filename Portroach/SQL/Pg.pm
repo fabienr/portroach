@@ -121,6 +121,13 @@ $$sql{portdata_gensites} =
 	      AS pd1
 	);
 
+# Prune
+
+$$sql{portdata_outdate} =
+	q(SELECT id, fullpkgpath, updated
+	    FROM portdata
+	    WHERE EXTRACT(EPOCH FROM updated) < CAST(? AS bigint));
+
 _transformsql();
 
 
@@ -157,6 +164,10 @@ sub new
 sub RegisterHacks
 {
 	my ($self) = shift;
+
+	my ($dbh) = @_;
+
+	$dbh->do("set timezone TO 'UTC';");
 
 	return;
 }

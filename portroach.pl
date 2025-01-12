@@ -226,9 +226,10 @@ sub ExecArgs
 	}
 	elsif ($cmd eq 'rebuild')
 	{
+	    my $time = time;
 	    $res = $datasrc->Build($sdbh);
 	    if ($res) {
-		$res = Prune($sdbh);
+		$res = Prune($sdbh, $time);
 	    }
 	}
 	elsif ($cmd eq 'mail')
@@ -1956,33 +1957,69 @@ sub ShowMailAddrs
 # Func: Prune()
 # Desc: Prune the database from removed ports
 #
+# Args: $time - also remove port older than ($time - 1 day)
+#
 # Retn: $success - true/false
 #------------------------------------------------------------------------------
 
 sub Prune
 {
     my $sdbh = shift;
-    my (%sths, $dbh, %ssths, $ssth, $sth);
+    my $time = shift;
+    my (%sths, $dbh, %ssths, $ssth, $sth, $prune);
 
     $dbh = connect_db();
-
-    print "-- [ Pruning removed ports ] -------------------------------------------\n\n";
-
-    prepare_sql($dbh,  \%sths,  qw( portdata_fullpkgpaths delete_removed ));
+    prepare_sql($dbh,  \%sths,  qw( portdata_fullpkgpaths delete_removed portdata_outdate ));
     prepare_sql($sdbh, \%ssths, qw( sqlports_check_fullpkgpath ));
+
+    print "-- [ Pruning removed ports ] -------------------------------------------\n";
+
     $sths{portdata_fullpkgpaths}->execute() or die $DBI::errstr;
 
     # Go through all our pkgpaths, and remove anything which cannot be found in SQLports
+    $prune = 0;
     while (my $port = $sths{portdata_fullpkgpaths}->fetchrow_hashref) {
 	$ssths{sqlports_check_fullpkgpath}->execute($port->{fullpkgpath});
-        unless (my $match = $ssths{sqlports_check_fullpkgpath}->fetchrow_array) {
-	    $sths{delete_removed}->execute($port->{id}) unless $settings{precious_data};
-	    info(0, $port->{fullpkgpath}, 'Removed');
+        unless (my ($match) = $ssths{sqlports_check_fullpkgpath}->fetchrow_array) {
+            if ($settings{precious_data}) {
+                info(0, $port->{fullpkgpath}, 'not removed (precious_data)');
+                next;
+            }
+            $prune++;
+            $sths{delete_removed}->execute($port->{id});
+            info(0, $port->{fullpkgpath}, 'removed');
 	}
     }
+    print "Prune done, $prune removed.\n";
+    unless ($time) {
+        $dbh->disconnect;
+        return 1;
+    }
 
+    # NOTE: this feature is intended to clean garbage from past build bugs
+    $sths{portdata_outdate}->execute($time) or die $DBI::errstr;
+    my $port = $sths{portdata_outdate}->fetchrow_hashref;
+    unless ($port) {
     $dbh->disconnect;
+        return 1;
+    }
 
+    print "-- [ Pruning outdated ports ] ------------------------------------------\n";
+
+    $prune = 0;
+    while (1) {
+        if ($settings{precious_data}) {
+            info(0, $port->{fullpkgpath}, 'not removed (precious_data)');
+            next;
+        }
+        regress($port->{fullpkgpath}, "outdated, updated " . $port->{updated});
+        next if (!$settings{regress});
+        $prune++;
+        $sths{delete_removed}->execute($port->{id});
+    } continue { last unless $port = $sths{portdata_outdate}->fetchrow_hashref};
+
+    print "Prune done, $prune removed.\n";
+    $dbh->disconnect;
     return 1;
 }
 

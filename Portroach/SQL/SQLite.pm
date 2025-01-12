@@ -109,6 +109,14 @@ $$sql{portdata_gensites} =
 	    GROUP BY sitedata.host
 	));
 
+# Prune
+
+$$sql{portdata_outdate} =
+	q(SELECT id, fullpkgpath, updated
+	    FROM portdata
+	    WHERE unixepoch(updated) < CAST(? as timestamp)
+	);
+
 _transformsql();
 
 
