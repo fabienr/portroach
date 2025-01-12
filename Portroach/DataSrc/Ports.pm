@@ -202,7 +202,7 @@ sub BuildPort
     }
 
     while(@ports = $q->fetchrow_array()) {
-	my ($fullpkgpath, $name, $category, $distname, @distfiles, $maintainer,
+	my ($fullpkgpath, $name, $category, $distname, $distfile, $maintainer,
 	    $comment, $sufx, %pcfg, @sites, $ver, $basepkgpath, $pcfg_comment,
 	    $homepage);
 	$n_port++;
@@ -211,8 +211,16 @@ sub BuildPort
 	$basepkgpath = tobasepkgpath($fullpkgpath);
 	$category    = primarycategory($ports[1]);
 
-	# Bail out early if the port has no distfiles to begin with
-	next if (split(/ /, $ports[3]) < 1);
+	# Fake $port to ease debugging
+	my $port = {'fullpkgpath' => $fullpkgpath,};
+
+	# Bail out early if the port has no distfile to begin with
+	if (!$ports[3]) {
+		info(0, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
+		    . "SKIP, no distfile");
+		$rej++;
+		next;
+	}
 
 	$name     = fullpkgpathtoport($fullpkgpath);
 
@@ -221,10 +229,10 @@ sub BuildPort
 	$distname =~ s/v[0-9]+$//;
 	$distname =~ s/p[0-9]+$//;
 
-	foreach my $file (split /\s+/, $ports[3]) {
-	    $file =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
-	    push @distfiles, $file;
-	}
+	# XXX ROACH_URL is UNIQUE ! one distfile only
+	$distfile = $ports[3];
+	$distfile =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
+
 	$maintainer = $ports[5];
 	$comment    = $ports[6];
 	foreach (split /\s+/, $ports[7]) {
@@ -234,7 +242,7 @@ sub BuildPort
 	}
 	$pcfg_comment = $ports[8];
 	$homepage = $ports[9];
-	$sufx = extractsuffix($distfiles[0]);
+	$sufx = extractsuffix($distfile);
 	foreach my $site (split /\s+/, $ports[4]) {
 		my $ignored = 0;
 
@@ -315,16 +323,16 @@ sub BuildPort
 
 	$ps->AddPort({
 	    'name'        => $name,
-	    'category'    => $category,
-	    'version'     => $ver,
+	    'cat'         => $category,
+	    'ver'         => $ver,
 	    'maintainer'  => $maintainer,
 	    'comment'     => $comment,
 	    'distname'    => $distname,
 	    'suffix'      => $sufx,
-	    'distfiles'   => \@distfiles,
+	    'distfile'    => $distfile,
 	    'sites'       => \@sites,
 	    'options'     => \%pcfg,
-	    'pcfg_comment'  => $pcfg_comment,
+	    'pcfg_comment'=> $pcfg_comment,
 	    'homepage'    => $homepage,
 	    'basepkgpath' => $basepkgpath,
 	    'fullpkgpath' => $fullpkgpath,

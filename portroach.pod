@@ -128,7 +128,7 @@ ensure Portroach knows about the changes:
 
     $ portroach check
 
-This will instruct Portroach to search for new distfiles for each port in the
+This will instruct Portroach to search for new distfile for each port in the
 database. It will take several hours for a complete ports tree scan.
 
 =head2 View Results
@@ -244,7 +244,8 @@ The restrict_* variables don't affect generate/mail.
 
 =item
 
-Portroach doesn't handle ports with multiple distfiles very well.
+Portroach doesn't handle ports with multiple distfiles. It uses ROACH_URL which
+is the first(main) distfile chosen by bsd.port.mk from the port's Makefile.
 
 =item
 

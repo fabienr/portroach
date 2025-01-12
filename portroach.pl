@@ -276,7 +276,7 @@ sub ExecArgs
 #------------------------------------------------------------------------------
 # Func: Check()
 # Desc: Using the information found from a run of Build(), attempt to
-#       identify ports with possible updated distfiles.
+#       identify ports with possible updated distfile.
 #
 # Args: n/a
 #
@@ -448,6 +448,7 @@ sub VersionCheck
 	# Override MASTER_SITES if requested
 	$port->{mastersites} = $port->{indexsite} if ($port->{indexsite});
 
+# XXX s/distfiles/distfile/
 	return if (!$port->{distfiles} || !$port->{mastersites});
 
 	info(1, $k, 'VersionCheck()');
@@ -775,8 +776,10 @@ sub VersionCheck
 
 					info(1, $k, $host, "Guessing version $port->{ver} -> $guess_v");
 
-					foreach my $distfile (split ' ', $port->{distfiles})
-					{
+# XXX s/distfiles/distfile/
+					#foreach my $distfile (split ' ', $port->{distfiles})
+					#{
+						my $distfile = $port->{distfiles};
 						my $site = $site->clone;
 
 						next unless ($distfile =~ s/$old_v/$guess_v/gi);
@@ -815,7 +818,7 @@ sub VersionCheck
 						}
 
 						last if ($new_found);
-					}
+					#} XXX s/distfiles/distfile/
 
 					last if ($new_found);
 				}
@@ -914,9 +917,10 @@ sub FindNewestFile
 		}
 
 		$golang = 1 if ($port->{mastersites} =~ /proxy\.golang\.org/);
-
-		foreach my $distfile (split ' ', $port->{distfiles})
-		{
+		# XXX s/distfiles/distfile/
+		#foreach my $distfile (split ' ', $port->{distfiles})
+		#{
+			my $distfile = $port->{distfiles};
 			# in Go we explicitly know what the next version is if we have it.
 			next if ($golang);
 			my $v = $port->{ver};
@@ -1153,7 +1157,7 @@ sub FindNewestFile
 					debug(__PACKAGE__, $port, "skip $new_v < $old_v");
 				}
 			}
-		}
+		#} XXX s/distfiles/distfile/
 	}
 
 	# Compare version to previously found new version,

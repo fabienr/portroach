@@ -81,7 +81,7 @@ sub new
 #                    category    - Category                          (required)
 #                    version     - Current port version              (required)
 #                    maintainer  - Port maintainer e-mail            (required)
-#                    distfiles   - Array of filenames.               (required)
+#                    distfile    - Site's filename.                  (required)
 #                    sites       - Array of sites to find files      (required)
 #                    distname    - "distname" (as in ports)
 #                    suffix      - Distfile suffix (e.g. ".tar.gz")
@@ -119,15 +119,17 @@ sub AddPort
 		}
 	}
 
-	foreach my $key (qw(sites distfiles)) {
-		if (ref $port->{$key} ne 'ARRAY') {
-			if ($port->{$key} =~ /\s/) {
-				print STDERR "Wrong format for $key: should be an arrayref or single item.\n";
+	if (ref $port->{sites} ne 'ARRAY') {
+		if ($port->{sites} =~ /\s/) {
+			print STDERR "$port->{fullpkgpath}: "
+				. "wrong format for sites, "
+				. "should be an arrayref or single item.\n";
+			debug(__PACKAGE__, $port, Dumper($port));
 				return 0;
 			}
-			$port->{$key} = [ $port->{$key} ];
-		}
+		$port->{sites} = [ $port->{sites} ];
 	}
+	$_sites = join(' ', @{$port->{sites}});
 
 	# Optional fields
 
@@ -170,10 +172,10 @@ sub AddPort
 
 		unless ($settings{precious_data}) {
 			$sths->{portdata_update}->execute(
-				$port->{version},
+				$port->{ver},
 				$port->{comment},
-				$port->{category},
-				$_distfiles,
+				$port->{cat},
+				$port->{distfile},
 				$port->{distname},
 				$port->{suffix},
 				$_sites,
@@ -191,11 +193,11 @@ sub AddPort
 		unless ($settings{precious_data}) {
 			$sths->{portdata_insert}->execute(
 				$port->{name},
-				$port->{category},
+				$port->{cat},
 				$port->{distname},
-				$port->{version},
+				$port->{ver},
 				$port->{comment},
-				$_distfiles,
+				$port->{distfile},
 				$port->{suffix},
 				$_sites,
 			    	$port->{maintainer},
@@ -219,7 +221,7 @@ sub AddPort
 			my ($val, $fullport);
 
 			$val = $port->{options}->{$var};
-			$fullport = "$port->{category}/$port->{name}";
+			$fullport = "$port->{cat}/$port->{name}";
 
 			if ($var !~ /^[A-Za-z]+$/i) {
 				print STDERR "$port->{fullpkgpath}: "
@@ -348,7 +350,7 @@ sub AddPort
 					or $invalid = 1;
 			}
 
-			if ($pcfg{skipbeta} && isbeta($port->{version})) {
+			if ($pcfg{skipbeta} && isbeta($port->{ver})) {
 				isbeta($newver)
 					and $invalid = 1;
 			}
