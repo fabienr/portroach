@@ -159,8 +159,8 @@ sub BuildDB
 sub BuildPort
 {
     my ($ps, $sdbh) = @_;
-    my (@ports, $q, $total_ports, $limit);
-    my $n_port = 0;
+    my (@ports, $q, $total_ports, $n_port, $rej, $meta, $dup, $bump, $up, $new);
+    $n_port = $rej = $meta = $dup = $bump = $up = $new = 0;
 
     my $sths = {};
     prepare_sql($sdbh, $sths, qw(ports_select ports_select_count
@@ -170,7 +170,7 @@ sub BuildPort
 
     # Apply any needed restrictions.
     if ($settings{restrict_maintainer}) {
-	$limit = "$settings{restrict_maintainer}%";
+	my $limit = "$settings{restrict_maintainer}%";
 
 	$sths->{ports_restrict_maintainer}->execute($limit) or die DBI->errstr;
 	$sths->{ports_restrict_maintainer_count}->execute($limit) or die DBI->errstr;
@@ -178,7 +178,7 @@ sub BuildPort
 	$total_ports = $sths->{ports_restrict_maintainer_count}->fetchrow_array();
 	$q = $sths->{ports_restrict_maintainer};
     } elsif ($settings{restrict_category}) {
-	$limit = "$settings{restrict_category}";
+	my $limit = "$settings{restrict_category}";
 
 	$sths->{ports_restrict_category}->execute($limit) or die DBI->errstr;
 	$sths->{ports_restrict_category_count}->execute($limit) or die DBI->errstr;
@@ -186,7 +186,7 @@ sub BuildPort
 	$total_ports = $sths->{ports_restrict_category_count}->fetchrow_array();
 	$q = $sths->{ports_restrict_category};
     } elsif ($settings{restrict_port}) {
-	$limit = "%$settings{restrict_port}%";
+	my $limit = "%$settings{restrict_port}%";
 
 	$sths->{ports_restrict_port}->execute($limit) or die DBI->errstr;
 	$sths->{ports_restrict_port_count}->execute($limit) or die DBI->errstr;
@@ -202,17 +202,26 @@ sub BuildPort
     }
 
     while(@ports = $q->fetchrow_array()) {
-	my ($fullpkgpath, $name, $category, $distname, $distfile, $maintainer,
-	    $comment, $sufx, %pcfg, @sites, $ver, $basepkgpath, $pcfg_comment,
-	    $homepage);
+	my (%pcfg, @sites, $fullpkgpath, $pkgname, $name,
+	    $category, $distname, $distfile, $maintainer, $comment, $sufx,
+	    $ver, $versrc, $basepkgpath, $pcfg_comment, $homepage, $port,
+	    $basename, $pathname, $basename_q, $pathname_q);
 	$n_port++;
 
+	$pkgname     = $ports[10];
 	$fullpkgpath = $ports[0];
 	$basepkgpath = tobasepkgpath($fullpkgpath);
 	$category    = primarycategory($ports[1]);
 
 	# Fake $port to ease debugging
-	my $port = {'fullpkgpath' => $fullpkgpath,};
+	$port = {'fullpkgpath' => $fullpkgpath,};
+
+	if ($category eq 'meta') {
+		info(1, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
+		    . "SKIP, meta package");
+		$meta++;
+		next;
+	}
 
 	# Bail out early if the port has no distfile to begin with
 	if (!$ports[3]) {
@@ -222,7 +231,19 @@ sub BuildPort
 		next;
 	}
 
-	$name     = fullpkgpathtoport($fullpkgpath);
+	# Extract name from pkgname but check dirname in case it's more explicit
+	$basename = $pkgname;
+	$basename =~ s/^(.*)-([^-]*)$/$1/g;
+	$pathname = fullpkgpathtoport($fullpkgpath);
+	if (index($pathname, $basename) != -1) {
+		debug(__PACKAGE__, $port, "prefer pkgpath, "
+		    . "name -> $pathname");
+		$name = $pathname;
+	} else {
+		debug(__PACKAGE__, $port, "prefer pkgname, "
+		    . "name -> $basename");
+		$name = $basename;
+	}
 
 	$distname = $ports[2];
 	# get rid of version/epoch markers
@@ -270,6 +291,8 @@ sub BuildPort
 		};
 	}
 
+	debug(__PACKAGE__, $port, "pkg $pkgname: ".
+	    "distfile $distfile, distname $distname");
 	if ($distname =~ /\d/) {
 		my $name_q;
 		$ver = $distname;
@@ -319,9 +342,14 @@ sub BuildPort
 		}
 	}
 
-	info(1, $fullpkgpath, "($n_port/$total_ports)");
+	unless ($ver) {
+		$ver = $versrc = $pkgname;
+		$ver =~ s/^(.*)-([^-]*)$/$2/g;
+		debug(__PACKAGE__, $port, 
+		    "fallback on pkgname version $ver");
+	}
 
-	$ps->AddPort({
+	my $rc = $ps->AddPort({
 	    'name'        => $name,
 	    'cat'         => $category,
 	    'ver'         => $ver,
@@ -337,8 +365,30 @@ sub BuildPort
 	    'basepkgpath' => $basepkgpath,
 	    'fullpkgpath' => $fullpkgpath,
 	});
+	if (!$rc) {
+		$rej++;
+		info(0, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
+		    . " REJ, $ver");
+	} elsif ($rc == 4) {
+		$dup++;
+		info(1, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
+		    . " DUP, $ver");
+	} elsif ($rc == 3) {
+		$bump++;
+		info(0, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
+		    . "BUMP, $ver");
+	} elsif ($rc == 2) {
+		$up++;
+		info(1, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
+		    . "  UP, $ver");
+	} else {
+		$new++;
+		info(0, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
+		    . " NEW, $ver");
+	}
     }
-
+    print "($total_ports) Build done: new $new, up. $up, "
+        . "bump(ver) $bump / rej. $rej, meta $meta, dup. $dup\n";
     return 1;
 }
 

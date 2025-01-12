@@ -62,9 +62,10 @@ sub new
 	prepare_sql(
 		$self->{dbh},
 		$self->{sths},
-		qw(portdata_exists portdata_update portdata_insert sitedata_exists
-		   sitedata_insert portdata_getver portdata_getnewver
-		   portdata_clearnewver portconfig_update portconfig_isstatic)
+		qw(portdata_exists portdata_update portdata_insert
+		    sitedata_exists sitedata_insert portdata_getinfo
+		    portdata_dedup portdata_getnewver portdata_clearnewver
+		    portconfig_update portconfig_isstatic)
 	);
 
 	bless ($self, $class);
@@ -78,8 +79,8 @@ sub new
 #
 # Args: \%port   - Hash containing data:
 #                    name        - Port name                         (required)
-#                    category    - Category                          (required)
-#                    version     - Current port version              (required)
+#                    cat         - Category                          (required)
+#                    ver         - Current port version              (required)
 #                    maintainer  - Port maintainer e-mail            (required)
 #                    distfile    - Site's filename.                  (required)
 #                    sites       - Array of sites to find files      (required)
@@ -92,7 +93,11 @@ sub new
 #                    basepkgpath - BASE_PKGPATH (calculated with tobasepkgpath) (required)
 #                    fullpkgpath - FULLPKGPATH (required)
 #
-# Retn: $success - true/false
+# Retn: $success - 4, duplicate, same basepkgpath & distfile (ROACH_URL)
+#                  3, version change
+#                  2, updated
+#                  1, added
+#                  0, error, rejected or regress
 #------------------------------------------------------------------------------
 
 sub AddPort
@@ -100,17 +105,18 @@ sub AddPort
 	my ($self) = shift;
 	my ($port) = @_;
 
-	my ($exists, $iss, $_distfiles, $_sites);
+	my ($_sites, $oldport, $iss);
 
+	my $rc = 0; # return error by default
 	my $dbh  = $self->{dbh};
 	my $sths = $self->{sths};
 
 	my $nvcleared = 0;
 
-	# Check for required fields
+	# Check for required fields. Note ver is handled later on.
 
 	foreach my $key (qw(
-		name category version maintainer distfiles sites basepkgpath fullpkgpath
+		name cat maintainer distfile sites basepkgpath fullpkgpath
 	)) {
 		if (!exists $port->{$key} || !$port->{$key}) {
 			print STDERR "$port->{fullpkgpath}: missing $key\n";
@@ -149,29 +155,64 @@ sub AddPort
 		return 0;
 	}
 
-	# Add port to database
+	# Add/Update port to database
 
-	$sths->{portdata_exists}->execute($port->{name}, $port->{basepkgpath});
-	($exists) = $sths->{portdata_exists}->fetchrow_array;
+	$sths->{portdata_getinfo}->execute($port->{fullpkgpath});
+	$oldport = $sths->{portdata_getinfo}->fetchrow_hashref;
 
-	$_sites = join(' ', @{$port->{sites}});
-	$_distfiles = join(' ', @{$port->{distfiles}});
+	# Check for required field ver
 
-	if ($exists)
+	if ($oldport && !exists $port->{ver} || !$port->{ver}) {
+		regress($port->{fullpkgpath},"missing version $oldport->{ver}");
+		debug(__PACKAGE__, $port, Dumper($port));
+		return 0;
+	} elsif (!exists $port->{ver} || !$port->{ver}) {
+		print STDERR "$port->{fullpkgpath}: missing version\n";
+		debug(__PACKAGE__, $port, Dumper($port));
+		return 0;
+	}
+
+	if ($oldport)
 	{
-		my $oldver;
+		my $regress;
+		my $samedist = ($port->{distname} eq $oldport->{distname});
+		my $samever = ($port->{ver} eq $oldport->{ver});
 
-		# Clear newver if current version changed.
-		$sths->{portdata_getver}->execute($port->{basepkgpath});
-		($oldver) = $sths->{portdata_getver}->fetchrow_array;
-		if ($oldver ne $port->{version}) {
-			$sths->{portdata_clearnewver}->execute($port->{basepkgpath})
-				unless ($settings{precious_data});
+		if ($samever) {
+			$rc = 2; # return code 2 means updated
+		} else {
+			$rc = 3; # return code 3 means version change
+		}
+
+		# Regress on unwanted changes (same distname)
+		# XXX ideally s/distname/pkgname/, not yet in DB
+		foreach my $v ("ver", "name", "cat") {
+			last if (!$samedist);
+			next unless ($port->{$v} ne $oldport->{$v});
+			regress($port->{fullpkgpath}, "same distname, $v "
+			    . "$oldport->{$v} -> $port->{$v}");
+			$regress = 1 if (!$settings{regress});
+		}
+
+		# Regress on version decrease
+		if (!$samedist && !$samever &&
+		    vercompare($port->{ver}, $oldport->{ver}) != 1) {
+			regress($port->{fullpkgpath}, "version decrease, "
+			    . "$oldport->{ver} -> $port->{ver}");
+			$regress = 1 if (!$settings{regress});
+		}
+
+		# Clear newver if version & port changed
+		if (!$samedist && !$samever) {
+			$sths->{portdata_clearnewver}->execute(
+			    $port->{fullpkgpath}
+			) unless ($settings{precious_data} || $regress);
 			$nvcleared = 1;
 		}
 
-		unless ($settings{precious_data}) {
+		unless ($settings{precious_data} || $regress) {
 			$sths->{portdata_update}->execute(
+				$port->{name},
 				$port->{ver},
 				$port->{comment},
 				$port->{cat},
@@ -183,14 +224,23 @@ sub AddPort
 			        $port->{pcfg_comment},
 			        $port->{homepage},
  	  	  	        $port->{basepkgpath},
- 	  	  	        $port->{fullpkgpath},
- 	  	  	        $port->{basepkgpath}
+				$port->{fullpkgpath}
 			) or die "Failed to execute: $DBI::errstr";
 		}
+		$rc = 0 if ($regress);
 	}
 	else
 	{
-		unless ($settings{precious_data}) {
+		$sths->{portdata_dedup}->execute(
+		    $port->{basepkgpath}, $port->{distfile});
+		if ($oldport = $sths->{portdata_dedup}->fetchrow_hashref) {
+			debug(__PACKAGE__, $port,
+			    "duplicate with $oldport->{fullpkgpath}");
+			$rc = 4; # return code 4 means duplicate
+		} else {
+			$rc = 1; # return code 1 means added
+		}
+		unless ($settings{precious_data} || $oldport) {
 			$sths->{portdata_insert}->execute(
 				$port->{name},
 				$port->{cat},
@@ -211,10 +261,10 @@ sub AddPort
 
 	# Portconfig stuff
 
-	$sths->{portconfig_isstatic}->execute($port->{name}, $port->{category});
-	($iss) = $sths->{portconfig_isstatic}->fetchrow_array;
-
-	if (!$iss) {
+	# XXX howto set pcfg_static ?
+	#$sths->{portconfig_isstatic}->execute($port->{name}, $port->{cat});
+	#($iss) = $sths->{portconfig_isstatic}->fetchrow_array;
+	#if (!$iss) {
 		my (%pcfg);
 
 		foreach my $var (keys %{$port->{options}}) {
@@ -312,7 +362,7 @@ sub AddPort
 		$sths->{portconfig_update}->execute(
 			$pcfg{indexsite}, $pcfg{limitver}, $pcfg{limiteven},
 			$pcfg{skipbeta}, $pcfg{skipversions}, $pcfg{limitwhich},
-		        $pcfg{ignore}, $port->{basepkgpath}
+		    $pcfg{ignore}, $port->{fullpkgpath}
 		) if (!$settings{precious_data});
 
 		# Ensure indexsite is added to sitedata
@@ -320,7 +370,7 @@ sub AddPort
 
 		my $newver;
 
-		$sths->{portdata_getnewver}->execute($port->{basepkgpath});
+		$sths->{portdata_getnewver}->execute($port->{fullpkgpath});
 		($newver) = $sths->{portdata_getnewver}->fetchrow_array;
 
 		# Determine if the portconfig constraints
@@ -356,10 +406,10 @@ sub AddPort
 			}
 
 			if ($invalid and !$settings{precious_data}) {
-				$sths->{portdata_clearnewver}->execute($port->{basepkgpath});
+				$sths->{portdata_clearnewver}->execute($port->{fullpkgpath});
 			}
 		}
-	}
+	#} XXX howto set pcfg_static ?
 
 	# Sites
 
@@ -368,7 +418,7 @@ sub AddPort
 		$self->AddSite($_) foreach (@{$port->{sites}});
 	}
 
-	return 1;
+	return $rc;
 }
 
 

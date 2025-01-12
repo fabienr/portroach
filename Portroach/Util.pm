@@ -848,9 +848,10 @@ sub fullpkgpathtoport
     my $fullpkgpath = shift;
     my $port = $fullpkgpath;
 
-    # Remove any categories, flavors and subpackages.
-    $port =~ s/.*\///g;
+    # Remove any versions, categories, flavors and subpackages.
     $port =~ s/,.*//g;
+    $port =~ s/\/[\d\.]+(\/|$)/$1/g;
+    $port =~ s/.*\///g;
 
     return $port;
 }

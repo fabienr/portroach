@@ -48,32 +48,38 @@ our %sql;
 # SQL that is common to all supported database engines.
 #------------------------------------------------------------------------------
 
-$sql{portdata_getver} =
-	q(SELECT ver
+$sql{portdata_getinfo} =
+	q(SELECT ver, distname, name, cat
 	    FROM portdata
-	   WHERE basepkgpath = ?);
+	   WHERE fullpkgpath = ?);
 
 $sql{portdata_getnewver} =
 	q(SELECT newver
 	    FROM portdata
-	   WHERE basepkgpath = ?);
+	   WHERE fullpkgpath = ?);
 
 $sql{portdata_clearnewver} =
 	q(UPDATE portdata
 	     SET newver = NULL, method = NULL
-	   WHERE basepkgpath = ?);
+	   WHERE fullpkgpath = ?);
+
+$sql{portdata_dedup} =
+	q(SELECT fullpkgpath
+	    FROM portdata
+	   WHERE basepkgpath = ? AND distfiles = ?);
 
 $sql{portdata_update} =
 	q(UPDATE portdata
-	     SET ver = ?,  comment = ?, cat = ?, distfiles = ?, distname = ?,
-	         sufx = ?, mastersites = ?, maintainer = ?, pcfg_comment = ?,
-	         homepage = ?, updated = CURRENT_TIMESTAMP, basepkgpath = ?,
-	         fullpkgpath = ?
-	   WHERE basepkgpath = ?);
+	     SET name = ?, ver = ?,  comment = ?, cat = ?, distfiles = ?,
+	         distname = ?, sufx = ?, mastersites = ?, maintainer = ?,
+	         pcfg_comment = ?, homepage = ?, updated = CURRENT_TIMESTAMP,
+	         basepkgpath = ?
+	   WHERE fullpkgpath = ?);
 
 
 # Port.pm:BuildPort()
 
+# order by make sure shorter (main) fullpkgpath come first
 $sql{create_view} =
    q(CREATE TEMP VIEW RoachData AS
     SELECT fullpkgpath, categories,
@@ -82,13 +88,14 @@ $sql{create_view} =
 	     roach_url as distfiles,
              roach_sites as master_sites, 
 	     maintainer, comment, portroach,
-	     portroach_comment, homepage
-        FROM portsq);
+	     portroach_comment, homepage,
+	     pkgname
+        FROM portsq ORDER BY fullpkgpath);
 
 $sql{ports_select} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-	     portroach_comment, homepage
+	     portroach_comment, homepage, pkgname
         FROM RoachData);
 
 $sql{ports_select_count} =
@@ -98,7 +105,7 @@ $sql{ports_select_count} =
 $sql{ports_restrict_maintainer} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage
+             portroach_comment, homepage, pkgname
         FROM RoachData
        WHERE maintainer like ?);
 
@@ -108,9 +115,9 @@ $sql{ports_restrict_maintainer_count} =
        WHERE maintainer like ?);
 
 $sql{ports_restrict_category} =
-    q(SELECT fullpkgpath, categories, distname, distfiles
+    q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage
+             portroach_comment, homepage, pkgname
         FROM RoachData
        WHERE categories like ?);
 
@@ -122,7 +129,7 @@ $sql{ports_restrict_category_count} =
 $sql{ports_restrict_port} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage
+             portroach_comment, homepage, pkgname
         FROM RoachData
        WHERE fullpkgpath like ?);
 
@@ -151,8 +158,9 @@ $sql{portconfig_update} =
 	     SET indexsite = ?, limitver = ?,     limiteven = ?,
 	         skipbeta = ?,  skipversions = ?, limitwhich = ?,
 	         ignore = ?
-	   WHERE basepkgpath = ?);
+	   WHERE fullpkgpath = ?);
 
+# XXX howto set pcfg_static ?
 $sql{portconfig_isstatic} =
 	q(SELECT pcfg_static
 	    FROM portdata
@@ -267,8 +275,7 @@ $sql{portdata_selectall_site} =
 	ORDER BY cat,name);
 
 $sql{portdata_selectall_limited} =
-	q(SELECT name, basepkgpath, limitver, limiteven, limitwhich, indexsite, skipversions,
-	         skipbeta, pcfg_comment, homepage
+	q(SELECT *
 	    FROM portdata
 	   WHERE ( limitver     is not NULL )
 	      OR ( limitwhich   is not NULL )
@@ -280,16 +287,15 @@ $sql{portdata_selectall_limited} =
 
 $sql{portdata_selectupdated} =
 	q(SELECT lower(maintainer) AS maintainer,
-	         basepkgpath, name, ver, newver
+	         fullpkgpath, name, ver, newver
 	    FROM portdata
 	   WHERE ver != newver
-	ORDER BY lower(maintainer), basepkgpath);
+	ORDER BY lower(maintainer), fullpkgpath);
 
 $sql{portdata_exists} =
-	q(SELECT 1
+	q(SELECT id
 	    FROM portdata
-	   WHERE name = ?
-	     AND basepkgpath = ?
+	   WHERE fullpkgpath = ?
 	   LIMIT 1);
 
 # MailMaintainers
@@ -299,7 +305,7 @@ $sql{maildata_select} =
 	    FROM maildata);
 
 $sql{portdata_findnewnew} =
-	q(SELECT name,cat,ver,newver,basepkgpath
+	q(SELECT *
 	    FROM portdata
 	   WHERE lower(maintainer) LIKE ?
 	     AND newver != ver
@@ -312,7 +318,7 @@ $sql{portdata_findnewnew} =
 $sql{portdata_setmailed} =
 	q(UPDATE portdata
 	     SET mailed = ?
-	   WHERE basepkgpath = ?);
+	   WHERE fullpkgpath = ?);
 
 # AddMailAddrs
 
@@ -335,6 +341,9 @@ $sql{maildata_delete} =
 	   WHERE lower(address) = lower(?));
 
 # Prune
+
+#$sql{portdata_outdate}
+
 $sql{delete_removed} =
     q(DELETE
     	FROM portdata
