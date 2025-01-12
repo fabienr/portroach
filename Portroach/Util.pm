@@ -101,6 +101,7 @@ $month_regex = 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
 $date_regex  = '(?<!\d)\d{4}([\-\.]?)(?:\d{2}|'.$month_regex.')\1\d{2}(?!\d)';
 
 # Sorted by occurences so most likely to hit the first entry
+# XXX looks broken, .tar.gz will match before -src.tar.gz
 @suffixes = qw(.tar.gz .tar.bz2 .tar.xz .tgz .gem .zip .tar.Z .tar .tar.lz .tbz .src.tar.gz .shar.gz -src.tar.gz -src.tar.bz2 .war .tbz2 .shar.Z .jar -src.tgz .src.tgz .pdf .gz -tar.Z -src.zip -bin.tar.gz .txi .tcl.gz .tar_1.bz2 .tar.z .tar.lzma .tar.bz2 .src.tar.bz2 .src.tar.Z .shar .sh.Z .sh .run .pl .otf .lzh .gz.sh .exe .Z ..tar.Z -source.zip -source.tar.gz -gpl.tgz -bin.tar.bz2);
 
 %beta_types = (
@@ -114,8 +115,10 @@ $date_regex  = '(?<!\d)\d{4}([\-\.]?)(?:\d{2}|'.$month_regex.')\1\d{2}(?!\d)';
 
 $beta_regex = join '|', map +($beta_types{$_}->{re}), keys %beta_types;
 
-$ext_regex   = '\.tar\.gz|\.tar\.bz2|\.tgz\|\.zip|\.tar\.xz|\.xz|\.txz|\.Z|\.tar\.Z';
-
+# XXX looks duplicate with @suffixes aka extractsuffix()
+$ext_regex   = '(\.tar|\.shar)?\.(gz|bz2|(t?x|l)?z|zst)|'
+    . '\.tar|\.shar|\.jar|\.tgz|\.zip|\.pdf|\.gem|\.otf|\.rpm|'
+    . '(\.langpack)?\.xpi|\.uqm|\.dictd|\.kar';
 
 #------------------------------------------------------------------------------
 # Func: strchop()
