@@ -94,8 +94,9 @@ mastersite ignore = *openbsd.org/pub/OpenBSD/distfiles/*
 
 oldfound enable  = true      				# Stop if curr. distfile found
 
-precious data		= false # Don't write anything to database
-#regress		= true	# Override databse on regression 
+precious data		= false	# Don't write anything to database
+#regress		= true	# Override database on regression (--regress)
+
 num children     = 15        				# How many worker children to spawn
 workqueue size   = 20        				# How many ports per child at a time
 
