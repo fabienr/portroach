@@ -72,7 +72,7 @@ sub CanHandle
 	# The following two URLs will be handled:
 	# http://bitbucket.org/{accountname}/{repo_slug}/get/
 	# https://bitbucket.org/{accountname}/{repo_slug}/downloads/
-	return ($url =~ /http(s?):\/\/bitbucket\.org\/.*?(get|downloads)\//);
+	return ($url =~ /https?:\/\/bitbucket\.org\/.*?(get|downloads)\//);
 }
 
 

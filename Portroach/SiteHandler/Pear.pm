@@ -67,7 +67,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /http:\/\/pear\.php\.net\/get\//);
+	return ($url =~ /https?:\/\/pear\.php\.net\/get\//);
 }
 
 

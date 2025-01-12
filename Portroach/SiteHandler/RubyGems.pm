@@ -69,7 +69,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /https:\/\/rubygems\.org\/downloads\//);
+	return ($url =~ /https?:\/\/rubygems\.org\/downloads\//);
 }
 
 

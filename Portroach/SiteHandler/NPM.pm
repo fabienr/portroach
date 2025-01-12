@@ -69,7 +69,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /https:\/\/registry\.npmjs\.org\//);
+	return ($url =~ /https?:\/\/registry\.npmjs\.org\//);
 }
 
 
