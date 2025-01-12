@@ -442,7 +442,7 @@ sub VersionCheck
 
 	my ($k, $i);
 
-	$k = $port->{name};
+	$k = $port->{fullpkgpath};
 	$i = 0;
 
 	# Override MASTER_SITES if requested
