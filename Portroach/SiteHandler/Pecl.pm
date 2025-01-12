@@ -111,7 +111,7 @@ sub GetFiles
 	    my $dl = "http://download.pecl.php.net/package/" . $package . "-" . $latest . ".tgz";
 	    push @$files, $dl;
 	} else {
-	    debug(__PACKAGE__, $port, strchop($query, $60)
+	    info(1, $port->{fullpkgpath}, strchop($query, $60)
 	        . ": $resp->status_line");
 	    return 0;
 	}

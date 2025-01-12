@@ -33,9 +33,7 @@ use Portroach::Config;
 
 require Exporter;
 
-if ($settings{debug}) {
     use Data::Dumper;
-}
 
 use strict;
 
@@ -115,9 +113,8 @@ sub AddPort
 		name category version maintainer distfiles sites basepkgpath fullpkgpath
 	)) {
 		if (!exists $port->{$key} || !$port->{$key}) {
-			print STDERR "Insufficient data for "
-			    . "$port->{basepkgpath}: missing $key\n";
-			print Dumper($port) if $settings{debug};
+			print STDERR "$port->{fullpkgpath}: missing $key\n";
+			debug(__PACKAGE__, $port, Dumper($port));
 			return 0;
 		}
 	}
@@ -144,7 +141,9 @@ sub AddPort
 	# Sanity checks
 
 	if ($port->{name} =~ /[\s\/]/) {
-		print STDERR "Bad port name or category provided.\n";
+		print STDERR "$port->{fullpkgpath}: bad port name, "
+		    . "space or / not allowed, $port->{name}\n";
+		debug(__PACKAGE__, $port, Dumper($port));
 		return 0;
 	}
 
@@ -223,14 +222,18 @@ sub AddPort
 			$fullport = "$port->{category}/$port->{name}";
 
 			if ($var !~ /^[A-Za-z]+$/i) {
-				print STDERR "Invalid portconfig tuple ($var) found " .
-				             "in port $fullport\n";
+				print STDERR "$port->{fullpkgpath}: "
+				    . "invalid portconfig tuple ($var)\n";
 				next;
 			}
 
 			if ($var eq 'site') {
-				$pcfg{indexsite} = $val
-					if ($val =~ /^(?:ftp|https?):\/\/[^\/]+/i);
+				if ($val =~ /^(?:ftp|https?):\/\/[^\/]+/i) {
+					$pcfg{indexsite} = $val;
+					next;
+				}
+				print STDERR "$port->{fullpkgpath}: "
+				    . "invalid portconfig site ($val)\n";
 				next;
 			}
 
@@ -244,8 +247,8 @@ sub AddPort
 				};
 
 				if ($@) {
-					print STDERR 'Bad regex provided by portconfig ' .
-					             "variable in port $fullport\n";
+					print STDERR "$port->{fullpkgpath}: "
+					    . "bad portconfig regex ($val)\n";
 					next;
 				};
 
@@ -283,16 +286,16 @@ sub AddPort
 					$pcfg{limitwhich} = $1;
 					$pcfg{limiteven}  = $2 eq 'even' ? 1 : 0;
 				} else {
-					print STDERR 'Bad limitw value provided by ' .
-					             "portconfig variable in port $fullport\n";
+					print STDERR "$port->{fullpkgpath}: "
+					    . "bad portconfig limitw ($val)\n";
 				}
 				next;
 			}
 
 			# We've checked for all the variables we support
 
-			print STDERR "Unknown portconfig key ($var) found " .
-			             "in port $fullport\n";
+			print STDERR "$port->{fullpkgpath}: "
+			    . "unknown portconfig key ($var)\n";
 		}
 
 		# Nullify any variables we haven't accumulated

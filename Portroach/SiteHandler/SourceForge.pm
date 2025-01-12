@@ -116,7 +116,7 @@ sub GetFiles
 		$resp = $ua->get($query);
 
 		if (!$resp->is_success || $resp->status_line !~ /^2/) {
-			debug(__PACKAGE__, $port, strchop($query, $60)
+			info(1, $port->{fullpkgpath}, strchop($query, $60)
 			    . ": $resp->status_line");
 			return 0;
 		}

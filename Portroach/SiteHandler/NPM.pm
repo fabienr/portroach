@@ -117,7 +117,7 @@ sub GetFiles
 
 	    push(@$files, "$package/-/$package-$version.tgz");
 	} else {
-	    debug(__PACKAGE__, $port, strchop($query, $60)
+	    info(1, $port->{fullpkgpath}, strchop($query, $60)
 	        . ": $resp->status_line");
 	    return 0;
 	}

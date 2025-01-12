@@ -136,19 +136,17 @@ sub BuildDB
 	$ssths{sqlports_count_ports}->execute or die DBI->errstr;
 	$num_ports = $ssths{sqlports_count_ports}->fetchrow_array();
 
-	print "\n" unless ($num_ports < 1 or $settings{quiet});
+	print "\n" unless ($num_ports < 1 or !$settings{verbose});
 
-	if ($num_ports > 1) {
-	    print("Building...\n\n");
+	if ($num_ports >= 1) {
+		print "Building...\n";
 	} else {
-	    print("None found!\n");
+		print "None found!\n";
 	}
 
 	BuildPort($ps, $sdbh);
 
-	if ($num_ports > 1) {
-		print "\n" unless ($settings{quiet});
-	}
+	print "\n" unless ($num_ports <= 1 or !$settings{verbose});
 
 	setstat('buildtime', $buildtime);
 
@@ -244,7 +242,7 @@ sub BuildPort
 		$site =~ s/\/+$/\//;
 		$site =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g; # site group spec.
 		if (length($site) == 0) {
-			print "Empty or no master sites for $basepkgpath \n" unless ($settings{quiet});
+			print STDERR "$fullpkgpath: empty or no master sites\n";
 			next;
 		}
 		try {
@@ -258,7 +256,9 @@ sub BuildPort
 
 			push(@sites, $site) unless $ignored;
 		} catch {
-			warn "caught error: $_";
+			print STDERR "$fullpkgpath: "
+			    . "caught error on $site:\n";
+			print STDERR "$fullpkgpath: $_";
 		};
 	}
 

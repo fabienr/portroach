@@ -84,7 +84,8 @@ hide unchanged   = false     				# Show ports with no updates.
 
 #-- Other Settings ------------------------------------------------------------
 
-# debug = true                              # Enable debug mode
+#verbose =		true	# Enable verbose mode (--verbose)
+#debug =		true	# Enable debug mode (--debug)
 
 mastersite limit = 4         				# Give up after this many sites
 

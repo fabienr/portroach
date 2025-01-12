@@ -118,7 +118,7 @@ sub GetFiles
 		    push(@$files, $dl->{name});
 	    }
 	} else {
-	    debug(__PACKAGE__, $port, strchop($query, $60)
+	    info(1, $port->{fullpkgpath}, strchop($query, $60)
 	        . ": $resp->status_line");
 	    return 0;
 	}

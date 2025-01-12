@@ -676,7 +676,7 @@ sub regress
 # Func: info()
 # Desc: Format arguments into message and print.
 #
-# Args: $full - 0/1 to indicate wether to use the full width (60).
+# Args: $verbose - 0/1 print depending on verbose setting.
 #       @str - Array of message parts to chop and format.
 #       $msg - Message to print unformatted after other parts.
 #
@@ -685,24 +685,29 @@ sub regress
 
 sub info
 {
-	my $full = shift;
+	my $verbose = shift;
 	my @items = (@_);
 	my ($str, $msg);
 
-	# 60 is chosen so that "(xxxxx/xxxxx)" will fit
+	# width is diveded by 2 for eah @str
+	# use at most two: [---30---] [-15-] $msg
 	my $width = 30;
-	$width *= 2 if $full;
 
-	return if ($settings{quiet});
+	return if ($verbose && !$settings{verbose});
 
 	$msg = pop (@items);
 
 	foreach (@items) {
 		$str .= ' ' if ($str);
 		$str .= '[' . strchop($_, $width) . ']';
+		$width /= 2;
 	}
 
+	if ($str) {
 	print "$str $msg\n";
+	} else {
+		print "$msg\n";
+	}
 }
 
 #------------------------------------------------------------------------------

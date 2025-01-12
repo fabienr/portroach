@@ -64,6 +64,7 @@ my (@paths, %settings_types, $bool_opts);
 	datasrc         	=> 'Portroach::DataSrc::Ports',
 	datasrc_opts    	=> '',
 
+	regress			=> 0,		# Don't override database on regression
 	precious_data   	=> 0, 		# Don't write anything to database
 	num_children    	=> 15,		# Number of child processes to spawn
 	workqueue_size  	=> 20,		# Size of work queue per child
@@ -104,7 +105,7 @@ my (@paths, %settings_types, $bool_opts);
 	group           	=> '',
 
 	debug           	=> 0,
-	quiet           	=> 0,
+	verbose         	=> 0,
 
 	hide_unchanged  	=> 0,
 
@@ -118,7 +119,7 @@ my (@paths, %settings_types, $bool_opts);
 
 # Roughly work out variable types
 
-$bool_opts = 'ftp_passive|hide_unchanged|debug|quiet';
+$bool_opts = 'ftp_passive|hide_unchanged|debug|verbose|regress';
 
 foreach (keys %settings) {
 	if (/^(?:.+_enable|.+_data|$bool_opts)$/) {
@@ -241,7 +242,8 @@ sub ParseConfigFile
 		$var = lc $var;
 
 		if ($var !~ /^[a-z\_]+$/) {
-			print STDERR "Invalid variable name found in config file $filename, line $lineno\n";
+			print STDERR "Invalid variable name in config file "
+			    . "$filename, line $lineno\n";
 			return 0;
 		}
 

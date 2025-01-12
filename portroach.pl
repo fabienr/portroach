@@ -80,7 +80,7 @@ sub terminate
 	local $SIG{INT} = 'IGNORE';
 	kill('TERM', -$$);
 
-	print "PID #$$ Terminating...\n";
+	info(1, "PID #$$", "Terminating...");
 	exit 1;
 }
 
@@ -117,22 +117,18 @@ sub main
 {
 	my ($dbengine);
 
-	if ($settings{debug}) {
-		print STDERR '-' x 72 . "\n";
-		print STDERR "Using settings:\n";
-		print STDERR "  Variable: $_ -> $settings{$_}\n"
-			foreach (keys %settings);
-		print STDERR '-' x 72 . "\n";
-	}
-
 	Usage() if (!defined $ARGV[0]);
 
 	if ($ARGV[0] eq 'debug')
 	{
+		debug(__PACKAGE__, 0, '-' x 72);
+		debug(__PACKAGE__, 0, "Using settings:");
+		debug(__PACKAGE__, 0, "  Variable: $_ -> $settings{$_}")
+		    foreach (keys %settings);
+		debug(__PACKAGE__, 0, '-' x 72);
 		if ($#ARGV == 3 and $ARGV[1] eq 'vercompare')
 		{
 			my $res;
-			print 'vercompare: ';
 			if ($ARGV[2] eq $ARGV[3]) {
 				$res = '=';
 			} elsif (vercompare($ARGV[2], $ARGV[3])) {
@@ -140,15 +136,14 @@ sub main
 			} else {
 				$res = '<';
 			}
-			print "$ARGV[2] $res $ARGV[3]\n";
-
+			print "vercompare: $ARGV[2] $res $ARGV[3]\n";
 			exit 0;
 		} else {
 			Usage();
 		}
 	}
 
-	print APPNAME.' v'.APPVER.', by '.AUTHOR."\n\n";
+	info(1, APPNAME . ' v'. APPVER . 'by ' . AUTHOR);
 
 	SwitchUser();
 
@@ -158,17 +153,17 @@ sub main
 	$dbengine =~ s/^\s*DBI:([A-Za-z0-9]+):?.*$/$1/;
 
 	Portroach::SQL->Load($dbengine)
-		or die 'Failed to load queries for DBI engine "' . $dbengine . '"';
+		or die 'Failed to load queries for DBI engine "'.$dbengine.'"';
 
 	# Check DB schema version
 	if (getdbver() != DB_VERSION) {
-		print STDERR "Database schema mismatch; did you forget to upgrade?\n";
+		print STDERR "Database schema mismatch; upgrade ?\n";
 		exit 1;
 	}
 
 	if ($dbengine eq 'SQLite' && $settings{num_children} > 0) {
-		print STDERR "SQLite is currently only supported in non-forking mode!\n"
-			. "--> Forcing num_children => 0...\n\n";
+		print STDERR "SQLite is currently only supported in non-forking"
+			. " mode!\n--> Forcing num_children => 0...\n";
 		$settings{num_children} = 0;
 		sleep 2;
 	}
@@ -206,12 +201,12 @@ sub ExecArgs
 
 	if ($cmd eq 'build')
 	{
-		print "-- [ Building ports database ] -----------------------------------------\n\n";
+		print "-- [ Building ports database ] -----------------------------------------\n";
 		$res = $datasrc->Build($sdbh);
 	}
 	elsif ($cmd eq 'check')
 	{
-		print "-- [ Checking ports distfiles ] ----------------------------------------\n\n";
+		print "-- [ Checking ports distfiles ] ----------------------------------------\n";
 
 		Proc::Queue::size($settings{num_children})
 			unless($settings{num_children} == 0);
@@ -345,7 +340,7 @@ sub Check
 			if ($pid) {
 				# Parent
 				my $progress = $num_rows - $i;
-				print "Spawned PID #$$ ($progress ports unallocated)\n";
+				info(1, "PID #$$", "Spawned ($progress ports unallocated)");
 				undef @workblock;
 			} else {
 				# Child
@@ -375,7 +370,7 @@ sub Check
 				$dbh->disconnect;
 
 				$time = (time - $time);
-				print "PID #$$ finished work block (took $time seconds)\n";
+				info(1, "PID #$$", "finished work block (took $time seconds)");
 
 				exit;
 			}
@@ -455,7 +450,7 @@ sub VersionCheck
 
 	return if (!$port->{distfiles} || !$port->{mastersites});
 
-	info(0, $k, 'VersionCheck()');
+	info(1, $k, 'VersionCheck()');
 
 	# Loop through master sites
 	$sths->{sitedata_select}->execute($port->{mastersites});
@@ -464,6 +459,7 @@ sub VersionCheck
 	{
 		my (@files, @dates, $site, $path_ver, $new_found, $old_found);
 		my $method = METHOD_LIST;
+		my $host = $sitedata->{host};
 
 		$old_found = 0;
 		$new_found = 0;
@@ -477,7 +473,7 @@ sub VersionCheck
 
 		$i++;
 
-		info(0, $k, 'Checking site: ' . strchop($site, 60));
+		info(1, $k, 'Checking site: ' . strchop($site, 60));
 
 		# Look to see if the URL contains the distfile version.
 		# This will affect our checks and guesses later on.
@@ -509,10 +505,10 @@ sub VersionCheck
 		# Check for special handler for this site first
 		if (my $sh = Portroach::SiteHandler->FindHandler($site))
 		{
-			info(0, $k, $site, 'Using dedicated site handler for site.');
+			info(1, $k, $host, 'Using dedicated site handler.');
 
 			if (!$sh->GetFiles($site, $port, \@files)) {
-				info(0, $k, $site, 'SiteHandler::GetFiles() failed for ' . $site);
+				info(1, $k, $host, 'SiteHandler::GetFiles() failed for ' . $site);
 				next;
 			} else {
 				$method = METHOD_HANDLER;
@@ -531,7 +527,7 @@ sub VersionCheck
 			);
 
 			if (!$ftp) {
-				info(0, $k, $site, 'FTP connect problem: ' . $@);
+				info(1, $k, $host, "FTP connect problem: ".$@);
 				$sths->{sitedata_failure}->execute($site->host)
 					unless ($settings{precious_data});
 				next;
@@ -540,7 +536,7 @@ sub VersionCheck
 			my $ftp_failures = 0;
 			while ($ftp_failures <= $settings{ftp_retries}) {
 				if (!$ftp->login('anonymous')) {
-					info(0, $k, $site, 'FTP login error: ' . $ftp->message);
+					info(1, $k, $host, 'FTP login error: ' . $ftp->message);
 
 					if ($ftp_failures == 0) {
 						$sths->{sitedata_failure}->execute($site->host)
@@ -551,7 +547,7 @@ sub VersionCheck
 
 					if ($ftp->message =~ /\b(?:IP|connections|too many|connected)\b/i) {
 						my $rest = 2+(int rand 15);
-						info(0, $k, $site,
+						info(1, $k, $host,
 							"Retrying FTP site in $rest seconds "
 							. "(attempt $ftp_failures of "
 							. "$settings{ftp_retries})"
@@ -566,15 +562,17 @@ sub VersionCheck
 				$ftp_failures = 0;
 				last;
 			}
-
-			next if ($ftp_failures);
+			if ($ftp_failures) {
+				info(1, $k, $host, 'FTP error: too many failure($ftp_failures)');
+				next;
+			}
 
 			# This acts as an error check, so we'll cwd to our
 			# original directory even if we're not going to look
 			# there.
 			if (!$ftp->cwd($site->path || '/')) {
 				$ftp->quit;
-				info(0, $k, $site, 'FTP cwd error: ' . $ftp->message);
+				info(1, $k, $host, 'FTP cwd error: ' . $ftp->message);
 				$sths->{sitedata_failure}->execute($site->host)
 					unless ($settings{precious_data});
 				next;
@@ -583,7 +581,8 @@ sub VersionCheck
 			@files = $ftp->ls;
 
 			if (!@files) {
-				info(0, $k, $site, 'FTP ls error (or no files found): ' . $ftp->message);
+				info(1, $k, $host, 'FTP ls error '
+				    . '(or no files found): ' . $ftp->message);
 				$ftp->quit;
 				next;
 			}
@@ -617,7 +616,7 @@ sub VersionCheck
 			$ftp->quit;
 
 			if (!@files) {
-				info(0, $k, $site, 'No files found.');
+				info(1, $k, $host, 'FTP: No files found.');
 				next;
 			}
 		}
@@ -626,7 +625,7 @@ sub VersionCheck
 			my ($ua, $response);
 
 			unless (robotsallowed($dbh, $site, $sitedata)) {
-				info(0, $k, $site, 'Ignoring site as per rules in robots.txt.');
+				info(1, $k, $host, 'Ignoring site as per rules in robots.txt.');
 
 				# Don't count 'robots' bans as a failure.
 				# (We fetch them from the database so that
@@ -685,17 +684,17 @@ sub VersionCheck
 								\@dates
 							) if ($response->is_success);
 
+							debug(__PACKAGE__, $port,
+							    "push $path$dir/$_")
+							    foreach (@files_tmp);
 							push @files, "$path$dir/$_"
 								foreach (@files_tmp);
 						}
 					}
 				}
-			}
-
-			if ($settings{debug}) {
-				print STDERR "Files for $port->{cat}/$port->{name} from $site:\n";
-				print STDERR "  --> $_\n"
-					foreach @files;
+			} else {
+				info(1, $port->{fullpkgpath}, strchop($site, $60)
+				    . ": $response->status_line");
 			}
 
 			# No files found - try some guesses
@@ -714,9 +713,8 @@ sub VersionCheck
 
 				# We keep a counter of "lies" from each site, and only
 				# re-check every so often.
-
 				if ($sitedata->{liecount} > 0) {
-					info(0, $k, $site, 'Not doing any guessing; site has previously lied.');
+					info(1, $k, $host, 'Not doing any guessing; site has previously lied.');
 					$sths->{sitedata_decliecount}->execute($sitedata->{host})
 						unless($settings{precious_data});
 					next;
@@ -729,7 +727,7 @@ sub VersionCheck
 
 				# Got a response which wasn't HTTP 4xx -> bail out
 				if ($response->is_success && $response->status_line !~ /^4/) {
-					info(0, $k, $site, 'Not doing any guessing; site is lieing to us.');
+					info(1, $k, $host, 'Not doing any guessing; site is lieing to us.');
 					$sths->{sitedata_initliecount}->execute($sitedata->{host})
 						unless($settings{precious_data});
 					next;
@@ -775,7 +773,7 @@ sub VersionCheck
 							and next;
 					}
 
-					info(0, $k, $site, "Guessing version $port->{ver} -> $guess_v");
+					info(1, $k, $host, "Guessing version $port->{ver} -> $guess_v");
 
 					foreach my $distfile (split ' ', $port->{distfiles})
 					{
@@ -803,7 +801,7 @@ sub VersionCheck
 
 						if ($response->is_success && $response->status_line =~ /^2/ &&
 								$headers{'content-type'} !~ /($bad_mimetypes)/i) {
-							info(0, $k, $site, "UPDATE $port->{ver} -> $guess_v");
+							info(0, $k, $host, "UPDATE $port->{ver} -> $guess_v");
 
 							$sths->{portdata_setnewver}->execute(
 								$guess_v, METHOD_GUESS, $url.$distfile,
@@ -813,7 +811,7 @@ sub VersionCheck
 							$new_found = 1;
 							last;
 						} else {
-							info(0, $k, $site, "Guess failed $port->{ver} -> $guess_v");
+							info(1, $k, $host, "Guess failed $port->{ver} -> $guess_v");
 						}
 
 						last if ($new_found);
@@ -826,6 +824,10 @@ sub VersionCheck
 			last if ($new_found);
 		}
 
+		debug(__PACKAGE__, $port, "Files for "
+		    . "$port->{fullpkgpath} from $site:");
+		debug(__PACKAGE__, $port, " -> $_") foreach @files;
+
 		# Make note of working site
 		$sths->{sitedata_success}->execute($site->host);
 
@@ -837,12 +839,17 @@ sub VersionCheck
 		}
 		next if (!@files);
 
+		info(1, $k, $host, 'Found ' . scalar @files . ' files');
+
+		debug(__PACKAGE__, $port, "port newver '$port->{newver}'");
+
 		my $file = FindNewestFile($port, $site, \@files);
 
 		$old_found = 1 if $file->{oldfound};
 
 		if ($file && $file->{newfound}) {
-			info(0, $k, $site, "UPDATE $port->{ver} -> $file->{version}");
+			info(0, $k, $host,
+			    "UPDATE $port->{ver} -> $file->{version}");
 			$sths->{portdata_setnewver}->execute(
 				$file->{version},
 				$method,
@@ -852,6 +859,7 @@ sub VersionCheck
 
 			last;
 		} elsif ($old_found) {
+			info(0, $k, $host, "FOUND old, method -> $method");
 			$sths->{portdata_setmethod}->execute(
 				$method,
 				$port->{id}
@@ -865,7 +873,7 @@ sub VersionCheck
 	$sths->{portdata_setchecked}->execute($port->{id})
 		unless ($settings{precious_data});
 
-	info(0, $k, 'Done');
+	info(1, $k, 'Done');
 }
 
 
@@ -961,6 +969,8 @@ sub FindNewestFile
 			if ($settings{freebsdhacks_enable}) {
 				foreach (@bad_versions) {
 					if ($file =~ /$_/i && $distfile !~ /$_/i) {
+					debug(__PACKAGE__, $port,
+					    "skip $file, bad $_");
 							$skip = 1;
 						last;
 					}
@@ -1026,6 +1036,8 @@ sub FindNewestFile
 					foreach (split (/\s+/, $port->{skipversions})) {
 						if ($new_v eq $_) {
 							$skip = 1;
+							debug(__PACKAGE__, $port,
+							    "skip $new_v eq $_");
 							last;
 						}
 					}
@@ -1035,12 +1047,24 @@ sub FindNewestFile
 
 				unless ($settings{sillystrings_enable} or $github) {
 					if ($new_v =~ /[-_.]([A-Za-z]+[A-Za-z_-]{2,})$/) {
+						debug(__PACKAGE__, $port,
+						    "sillystrings $new_v");
 						my $str = $1;
-						next if (
+						if (
 							$old_v !~ /[-_.]$str$/
 							&& ($str !~ /^($beta_regex)$/i
 								|| length $1 < length $str) # short RE match
-						);
+						) {
+							debug(__PACKAGE__, $port,
+							    "$old_v !~ [-_.]str");
+							debug(__PACKAGE__, $port,
+							    "$str !~ beta_regex") 
+							    if ($str !~ /^($beta_regex)$/i);
+							debug(__PACKAGE__, $port,
+							    "length $1 < length $str") 
+							    if (length $1 < length $str);
+							next;
+						}
 					}
 				}
 
@@ -1048,11 +1072,18 @@ sub FindNewestFile
 				# version-specific
 
 				if ($port->{limitver}) {
-					next unless ($new_v =~ /$port->{limitver}/);
+					unless ($new_v =~ /$port->{limitver}/) {
+						debug(__PACKAGE__, $port,
+						    "skip $new_v =~ /$port->{limitver}/");
+						next;
+					}
 				} elsif ($port->{name} =~ /^(.*\D)(\d{1,3})(?:[-_]\D+)?$/) {
 					my $nm_nums = $2;
 					my $vr_nums = $new_v;
 					my $vo_nums = $old_v;
+
+					debug(__PACKAGE__, $port,
+					    "prefix $1 nm_nums $nm_nums");
 
 					unless (($1.$2) =~ /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/i) {
 						my $fullver = '';
@@ -1061,26 +1092,42 @@ sub FindNewestFile
 							last if ($fullver eq $nm_nums);
 						}
 
+						debug(__PACKAGE__, $port,
+						    "fullver $fullver nm_nums $nm_nums");
 						if ($fullver eq $nm_nums) {
 							$vr_nums =~ s/[-_\.]//g;
-							next unless ($vr_nums =~ /^$nm_nums/);
+							unless ($vr_nums =~ /^$nm_nums/) {
+								debug(__PACKAGE__, $port,
+								    "skip $vr_nums =~ /^$nm_nums/");
+								next;
+							}
 						}
 					}
 				}
 
 				if (defined $port->{limiteven} and $port->{limitwhich} >= 0) {
-					next unless checkevenodd($new_v, $port->{limiteven},
-								 $port->{limitwhich});
+					unless (checkevenodd($new_v,
+					    $port->{limiteven}, $port->{limitwhich})) {
+						debug(__PACKAGE__, $port,
+						    "skip $new_v: "
+						    . "limiteven $port->{limiteven}, "
+						    . "limitwhich $port->{limitwhich}");
+						next;
+					}
 				}
 
 				# Test our new version string
+				debug(__PACKAGE__, $port,
+				    "check new_v $new_v <> old_v $old_v");
 
 				if ($new_v eq $old_v)
 				{
+					debug(__PACKAGE__, $port, "old found");
 					$old_found = 1;
 				}
 				elsif (vercompare($new_v, $old_v))
 				{
+					debug(__PACKAGE__, $port, "new found");
 					$new_found = 1;
 
 					# Keep going until we find the newest version
@@ -1098,8 +1145,12 @@ sub FindNewestFile
 
 						uri_filename($poss_url, $file);
 
+						debug(__PACKAGE__, $port, "last found "
+						    . "poss $poss_match '$poss_url'");
 						next;
 					}
+				} else {
+					debug(__PACKAGE__, $port, "skip $new_v < $old_v");
 				}
 			}
 		}
@@ -1158,8 +1209,7 @@ sub robotsallowed
 	if ($site->{robots_outofdate} || $site->{robots} == ROBOTS_UNKNOWN) {
 		my ($ua, $response);
 
-		print STDERR "(Robots) Processing robots.txt for $site->{host}\n"
-			if ($settings{debug});
+		info(1, "(R) $site->{host}", "processing robots.txt");
 
 		$ua = LWP::UserAgent->new;
 		$ua->agent(USER_AGENT);
@@ -1171,9 +1221,7 @@ sub robotsallowed
 			if ($response->status_line =~ /^4/) {
 				# HTTP 404 = no blocks. We can roam free.
 				$allowed = ROBOTS_ALLOW;
-
-				print STDERR "(Robots) No robots.txt for $site->{host}\n"
-					if ($settings{debug});
+				info(1, "(R) $site->{host}", "no robots.txt");
 			} else {
 				# Process rules
 				my ($data, $agentmatch);
@@ -1219,10 +1267,8 @@ sub robotsallowed
 							$agentmatch = 0;
 						}
 
-						print STDERR "(Robots) Rule found for $site->{host} -> $rule "
-						             . "(matched: $agentmatch; type: $allowed)\n"
-							if ($settings{debug});
-
+						info(1, "(R) $site->{host}", "-> $rule "
+						    . "(matched: $agentmatch; type: $allowed)");
 						next;
 					}
 
@@ -1270,8 +1316,7 @@ sub robotsallowed
 		my $pathstart = substr($sitepath, 0, length $_);
 		if ($pathstart eq $_) {
 			$pathmatch = 1;
-			print STDERR "(Robots) Path matched for $site->{host} ($_)\n"
-				if ($settings{debug});
+			info(1, "(R) $site->{host}", "path matched ($_)");
 			last;
 		}
 	}
@@ -1280,9 +1325,13 @@ sub robotsallowed
 
 	if ($settings{robots_checking} eq 'strict') {
 		# Explicit 'allow' only
+		info(1, "(R) strict $site->{host}", ($allowed == ROBOTS_ALLOW ?
+		    "Allow " : "Block ") . strchop($url, 60));
 		return ($allowed == ROBOTS_ALLOW);
 	} else {
 		# Ignore blanket bans
+		info(1, "(R) $site->{host}", ($allowed == ROBOTS_ALLOW ?
+		    "Allow " : "Block ") . strchop($url, 60));
 		return ($allowed != ROBOTS_SPECIFIC);
 	}
 }
@@ -1384,7 +1433,9 @@ sub GenerateHTML
 			'outdated_percentage' => sprintf('%.2f', ($outdated/$total)*100),
 		};
 
-		open(my $fh, '>>', "$settings{html_data_dir}/json/maintainers.json") or die $!;
+		open(my $fh, '>>', "$settings{html_data_dir}/json/maintainers.json")
+		    or die "maintainers.json: $!";
+		
 		print $fh JSON::encode_json(\%totals);
 		close($fh);
 		undef $totals{'results'};
@@ -1441,7 +1492,8 @@ sub GenerateHTML
 		}
 
 		$totals{'results'} = \@results;
-		open(my $fh, '>>', "$settings{html_data_dir}/json/categories.json") or die $!;
+		open(my $fh, '>>', "$settings{html_data_dir}/json/categories.json")
+		    or die "categories.json: $!";
 		print $fh JSON::encode_json(\%totals);
 		close($fh);
 		undef $totals{'results'};
@@ -1482,7 +1534,8 @@ sub GenerateHTML
 		}
 
 		$totals{'results'} = \@results;
-		open(my $fh, '>>', "$settings{html_data_dir}/json/sites.json") or die $!;
+		open(my $fh, '>>', "$settings{html_data_dir}/json/sites.json")
+		    or die "sites.json: $!";
 		print $fh JSON::encode_json(\%totals);
 		close($fh);
 		undef $totals{'results'};
@@ -1506,6 +1559,7 @@ sub GenerateHTML
 
 	while (my ($addr) = $sth->fetchrow_array)
 	{
+		info(1, "category:$outdata{index}");
 		$outdata{index} = $addr;
 		$template->applyglobal(\%outdata);
 
@@ -1545,7 +1599,8 @@ sub GenerateHTML
 		$template->reset;
 
 		if ($settings{output_type} =~ /(json|dynamic)/) {
-		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json") or warn "$outdata{index}: $!";
+		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json")
+		        or die "$outdata{index}.json: $!";
 		    print $fh JSON::encode_json(\@results);
 		    close($fh);
 		    undef @results;
@@ -1565,6 +1620,7 @@ sub GenerateHTML
 
 	while (my ($addr) = $sth->fetchrow_array)
 	{
+		info(1, "maintainer:$outdata{index}");
 		$outdata{index} = $addr;
 		$outdata{index} =~ s/\>[\s\,]+([^\s])/\>& $1/g;
 		$outdata{index} =~ s/\<.*?\>//g;
@@ -1608,7 +1664,8 @@ sub GenerateHTML
 		$template->reset;
 
 		if ($settings{output_type} =~ /(json|dynamic)/) {
-		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json") or warn "$outdata{index}: $!";
+		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json")
+		        or die "$outdata{index}.json: $!";
 		    print $fh JSON::encode_json(\@results);
 		    close($fh);
 		    undef @results;
@@ -1627,6 +1684,7 @@ sub GenerateHTML
 
 	while (my ($addr) = $sth->fetchrow_array)
 	{
+		info(1, "site:$outdata{index}");
 		$outdata{index} = $addr;
 		$template->applyglobal(\%outdata);
 
@@ -1665,7 +1723,8 @@ sub GenerateHTML
 		$template->reset;
 
 		if ($settings{output_type} =~ /(json|dynamic)/) {
-		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json") or warn "$outdata{index}: $!";
+		    open(my $fh, '>', "$settings{html_data_dir}/json/$outdata{index}.json")
+		        or die "$outdata{index}.json: $!";
 		    print $fh JSON::encode_json(\@results);
 		    close($fh);
 		    undef @results;
@@ -1696,7 +1755,8 @@ sub GenerateHTML
 	$dbh->disconnect;
 
 	if ($settings{output_type} =~ /(json|dynamic)/) {
-	    open(my $fh, '>', "$settings{html_data_dir}/json/restricted.json") or die $!;
+	    open(my $fh, '>', "$settings{html_data_dir}/json/restricted.json")
+	        or die "restricted.json: $!";
 	    print $fh JSON::encode_json(\@results);
 	    close($fh);
 	    undef @results;
@@ -1709,6 +1769,7 @@ sub GenerateHTML
 	emptydir("$settings{html_data_dir}/assets/");
 	@assets = glob("$assets_dir/*");
 	foreach my $asset (glob("$assets_dir/*")) {
+		info(1, "copy:$asset");
 		copy($asset, "$settings{html_data_dir}/assets") or die $!;
 	}
 
@@ -1734,7 +1795,7 @@ sub MailMaintainers
 		return 1;
 	}
 
-	print "Mailing maintainers of out-of-date ports...\n\n";
+	print "Mailing maintainers of out-of-date ports...\n";
 
 	$dbh = connect_db();
 
@@ -1822,11 +1883,11 @@ sub ShowUpdates
 
 	while (my $port = $sths{portdata_selectupdated}->fetchrow_hashref) {
 		if (!$maintainer || lc $maintainer ne lc $port->{maintainer}) {
-			print "\n" if ($maintainer);
+			info(1, " ") if ($maintainer);
 			$maintainer = $port->{maintainer};
-			print "${maintainer}'s ports:\n";
+			info(0, "${maintainer}'s ports.");
 		}
-		print "  $port->{basepkgpath} $port->{ver} -> $port->{newver}\n";
+		info(1, "$port->{fullpkgpath} $port->{ver} -> $port->{newver}");
 	}
 
 	finish_sql($dbh, \%sths);
@@ -1867,9 +1928,7 @@ sub AddMailAddrs
 		$sths{maildata_insert}->execute($addr)
 			if (!$exists && !$settings{precious_data});
 
-		print !$exists ? 'OK.' : 'already in database.';
-
-		print "\n";
+		print !$exists ? 'OK.\n' : 'already in database.\n';
 
 		$sths{maildata_exists}->finish;
 	}
