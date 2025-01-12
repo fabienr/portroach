@@ -38,7 +38,6 @@ require 5.006;
 
 sub Init    { 1; }
 sub Build   { 1; }
-sub Rebuild { 1; }
 
 sub bad_versions { []; }
 
