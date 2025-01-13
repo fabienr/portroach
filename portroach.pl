@@ -999,7 +999,7 @@ sub FindNewestFile
 					$new_v = lc $version;
 
 					# Catch a few missed cases
-					$new_v =~ s/(?:$ext_regex)$//;
+					$new_v =~ s/($ext_regex)$//i;
 
 					# Version is much longer than original - skip it
 					next if (length $new_v > (12 + length $old_v));

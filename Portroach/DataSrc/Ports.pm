@@ -313,7 +313,7 @@ sub BuildPort
 		$ver = $versrc = $verdist;
 
 		debug(__PACKAGE__, $port, "trim .ext -> $ver")
-		    if ($ver =~ s/(?:$ext_regex)$//i);
+		    if ($ver =~ s/($ext_regex)$//i);
 
 		debug(__PACKAGE__, $port, "trim path -> $ver")
 		    if ($ver =~ s/.*\///g);

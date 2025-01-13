@@ -44,7 +44,6 @@ our @EXPORT = qw(
 	$beta_regex
 	$month_regex
 	$ext_regex
-	@suffixes
 
 	&strchop
 	&emptydir
@@ -84,7 +83,7 @@ our @EXPORT = qw(
 
 our %settings;
 
-our (@months, $date_regex, $beta_regex, $month_regex, $ext_regex, @suffixes);
+our (@months, $date_regex, $beta_regex, $month_regex, $ext_regex);
 
 my %beta_types;
 
@@ -101,11 +100,8 @@ my %want_regex = (
 );
 
 $month_regex = 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
-$date_regex  = '(?<!\d)\d{4}([\-\.]?)(?:\d{2}|'.$month_regex.')\1\d{2}(?!\d)';
-
-# Sorted by occurences so most likely to hit the first entry
-# XXX looks broken, .tar.gz will match before -src.tar.gz
-@suffixes = qw(.tar.gz .tar.bz2 .tar.xz .tgz .gem .zip .tar.Z .tar .tar.lz .tbz .src.tar.gz .shar.gz -src.tar.gz -src.tar.bz2 .war .tbz2 .shar.Z .jar -src.tgz .src.tgz .pdf .gz -tar.Z -src.zip -bin.tar.gz .txi .tcl.gz .tar_1.bz2 .tar.z .tar.lzma .tar.bz2 .src.tar.bz2 .src.tar.Z .shar .sh.Z .sh .run .pl .otf .lzh .gz.sh .exe .Z ..tar.Z -source.zip -source.tar.gz -gpl.tgz -bin.tar.bz2);
+$date_regex  = '(?<!\d)\d{2,4}([\-\.]?)(?:\d{2}|'.$month_regex.')\1'
+    . '\d{2,4}(?!\d)';
 
 %beta_types = (
 	snapshot   => { re => 'svn|cvs|snap(?:shot)?', rank => 1 },
@@ -118,10 +114,9 @@ $date_regex  = '(?<!\d)\d{4}([\-\.]?)(?:\d{2}|'.$month_regex.')\1\d{2}(?!\d)';
 
 $beta_regex = join '|', map +($beta_types{$_}->{re}), keys %beta_types;
 
-# XXX looks duplicate with @suffixes aka extractsuffix()
-$ext_regex   = '(\.tar|\.shar)?\.(gz|bz2|(t?x|l)?z|zst)|'
+$ext_regex = '(\.tar|\.shar)?\.(bz2|(t?g|l|t?x|tb)?z|zst)|'
     . '\.tar|\.shar|\.jar|\.tgz|\.zip|\.pdf|\.gem|\.otf|\.rpm|'
-    . '(\.langpack)?\.xpi|\.uqm|\.dictd|\.kar';
+    . '(\.langpack)?\.xpi|\.uqm|\.dictd|\.kar|\.war|\.spl|\.exe';
 
 #------------------------------------------------------------------------------
 # Func: strchop()
@@ -635,10 +630,12 @@ sub extractdirectories
 
 sub extractsuffix
 {
-    my ($distname) = shift;
-    foreach my $sufx (@suffixes) {
-	return $sufx if $distname =~ m/$sufx/;
-    }
+	my ($sufx) = shift;
+	unless ($sufx =~ s/^(.*?)($ext_regex)$/$2/i) {
+		debug(__PACKAGE__, undef, "no suffix in $sufx");
+		return;
+	}
+	return $sufx;
 }
 
 #------------------------------------------------------------------------------
