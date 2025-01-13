@@ -465,10 +465,10 @@ sub VersionCheck
 	# Loop through master sites
 	foreach my $site (split ' ', $port->{mastersites})
 	{
-		my (@files, @dates, $sitedata,$path_ver,$new_found,$old_found);
-		my $method = METHOD_LIST;
+		my (@files, @dates, $host, $sitedata, $method, $path_ver,
+		    $new_found, $old_found, $file);
 
-		my $host = URI->new($site)->host;
+		$host = URI->new($site)->host;
 		$sths->{sitedata_select}->execute($host);
 		while (my $data = $sths->{sitedata_select}->fetchrow_hashref) {
 			print STDERR "$port->{fullpkgpath}: multiple sitedata "
@@ -484,6 +484,7 @@ sub VersionCheck
 			next;
 		}
 
+		$method = 0;
 		$old_found = 0;
 		$new_found = 0;
 
@@ -528,7 +529,18 @@ sub VersionCheck
 			info(1, $k, $host, 'Using dedicated site handler.');
 
 			if (!$sh->GetFiles($site, $port, \@files)) {
-				info(1, $k, $host, 'SiteHandler::GetFiles() failed for ' . $site);
+				info(1, $k, $host, 'SiteHandler::GetFiles() '
+				    . "failed for $site");
+			} else {
+				$method = METHOD_HANDLER;
+			}
+
+			# Try harder, append distfile
+			# XXX s/distfiles/distfile/
+			if (!$method && !$sh->GetFiles(
+			    $site.'/'.$port->{distfiles}, $port, \@files)) {
+				info(1, $k, $host, 'SiteHandler::GetFiles() '
+				    . "failed for $site/$port->{distfiles}");
 				next;
 			} else {
 				$method = METHOD_HANDLER;
@@ -536,9 +548,9 @@ sub VersionCheck
 		}
 		elsif ($site->scheme eq 'ftp')
 		{
-			my $ftp;
+			$method = METHOD_LIST;
 
-			$ftp = Net::FTP->new(
+			my $ftp = Net::FTP->new(
 				$site->host,
 				Port    => $site->port,
 				Timeout => $settings{ftp_timeout},
@@ -642,7 +654,7 @@ sub VersionCheck
 		}
 		else
 		{
-			my ($ua, $response);
+			$method = METHOD_LIST;
 
 			unless (robotsallowed($dbh, $site, $sitedata)) {
 				info(1, $k, $host, 'Ignoring site as per rules in robots.txt.');
@@ -654,6 +666,8 @@ sub VersionCheck
 
 				next;
 			}
+
+			my ($ua, $response);
 
 			$ua = LWP::UserAgent->new;
 			$ua->agent(USER_AGENT);
@@ -867,7 +881,7 @@ sub VersionCheck
 
 		debug(__PACKAGE__, $port, "port newver '$port->{newver}'");
 
-		my $file = FindNewestFile($port, $site, \@files);
+		$file = FindNewestFile($port, $site, \@files);
 
 		$old_found = 1 if $file->{oldfound};
 		$new_found = 1 if $file->{newfound};
