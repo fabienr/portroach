@@ -1304,18 +1304,16 @@ sub robotsallowed
 
 	# Do our records need updating?
 	if ($site->{robots_outofdate} || $site->{robots} == ROBOTS_UNKNOWN) {
-		my ($ua, $response);
+		my ($ua, $resp);
 
 		info(1, "(R) $site->{host}", "processing robots.txt");
 
-		$ua = LWP::UserAgent->new;
-		$ua->agent(USER_AGENT);
-		$ua->timeout($settings{http_timeout});
+		$ua = lwp_useragent();
 
-		$response = $ua->get($site->{type} . '://' . $site->{host} . '/robots.txt');
+		$resp = $ua->get("$site->{type}://$site->{host}/robots.txt");
 
-		if ($response->is_success) {
-			if ($response->status_line =~ /^4/) {
+		if ($resp->is_success) {
+			if ($resp->status_line =~ /^4/) {
 				# HTTP 404 = no blocks. We can roam free.
 				$allowed = ROBOTS_ALLOW;
 				info(1, "(R) $site->{host}", "no robots.txt");
@@ -1325,7 +1323,7 @@ sub robotsallowed
 
 				$allowed = ROBOTS_ALLOW;
 
-				$data = $response->content;
+				$data = $resp->content;
 
 				foreach (split /[\r\n]+/, $data) {
 					my $rule = $_;
