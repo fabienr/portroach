@@ -194,7 +194,7 @@ sub BuildPort
 
     while(@ports = $q->fetchrow_array()) {
 	my (%pcfg, @sites, $fullpkgpath, $pkgname, $name,
-	    $category, $distname, $distfile, $maintainer, $comment, $sufx,
+	    $category, $distname, $distfile, $url, $maintainer, $comment, $sufx,
 	    $ver, $versrc, $basepkgpath, $pcfg_comment, $homepage, $port,
 	    $basename, $pathname, $basename_q, $pathname_q);
 	$n_port++;
@@ -226,6 +226,9 @@ sub BuildPort
 	$basename = $pkgname;
 	$basename =~ s/^(.*)-([^-]*)$/$1/g;
 	$pathname = fullpkgpathtoport($fullpkgpath);
+
+	# Chose the most precise name to insert in database, mostly for lookup
+	# XXX not that usefull afterall ?
 	if (index($pathname, $basename) != -1) {
 		debug(__PACKAGE__, $port, "prefer pkgpath, "
 		    . "name -> $pathname");
@@ -241,9 +244,16 @@ sub BuildPort
 	$distname =~ s/v[0-9]+$//;
 	$distname =~ s/p[0-9]+$//;
 
-	# XXX ROACH_URL is UNIQUE ! one distfile only
+	# XXX ROACH_URL is UNIQUE ! one distfile only :)
 	$distfile = $ports[3];
 	$distfile =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
+
+	if ($distfile =~ /\?/) {
+		$url = $distfile;
+		$distfile =~ s/\?.*$//;
+		info(1, $fullpkgpath,
+		    "url detected $url -> $distfile");
+	}
 
 	$maintainer = $ports[5];
 	$comment    = $ports[6];
@@ -435,7 +445,7 @@ sub BuildPort
 	    'comment'     => $comment,
 	    'distname'    => $distname,
 	    'sufx'        => $sufx,
-	    'distfile'    => $distfile,
+	    'distfile'    => $url ? $url : $distfile,
 	    'sites'       => \@sites,
 	    'options'     => \%pcfg,
 	    'pcfg_comment'=> $pcfg_comment,
