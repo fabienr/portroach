@@ -140,15 +140,11 @@ sub BuildDB
 
 	if ($num_ports >= 1) {
 		print "Building...\n";
+		setstat('buildtime', $buildtime)
+		    if (BuildPort($ps, $sdbh));
 	} else {
 		print "None found!\n";
 	}
-
-	BuildPort($ps, $sdbh);
-
-	print "\n" unless ($num_ports <= 1 or !$settings{verbose});
-
-	setstat('buildtime', $buildtime);
 
 	finish_sql(\$dbh, \%sths);
 
@@ -169,6 +165,7 @@ sub BuildPort
 				 ports_restrict_port  ports_restrict_port_count));
 
     # Apply any needed restrictions.
+    my $rc = 1; # report success only if not restricted
     if ($settings{restrict_maintainer}) {
 	my $limit = "$settings{restrict_maintainer}%";
 
@@ -177,6 +174,7 @@ sub BuildPort
 
 	$total_ports = $sths->{ports_restrict_maintainer_count}->fetchrow_array();
 	$q = $sths->{ports_restrict_maintainer};
+	$rc = 0;
     } elsif ($settings{restrict_category}) {
 	my $limit = "$settings{restrict_category}";
 
@@ -185,6 +183,7 @@ sub BuildPort
 
 	$total_ports = $sths->{ports_restrict_category_count}->fetchrow_array();
 	$q = $sths->{ports_restrict_category};
+	$rc = 0;
     } elsif ($settings{restrict_port}) {
 	my $limit = "%$settings{restrict_port}%";
 
@@ -193,12 +192,18 @@ sub BuildPort
 
 	$total_ports = $sths->{ports_restrict_port_count}->fetchrow_array();
 	$q = $sths->{ports_restrict_port};
+	$rc = 0;
     } else {
 	$sths->{ports_select}->execute() or die DBI->errstr;
 	$sths->{ports_select_count}->execute() or die DBI->errstr;
 
 	$total_ports = $sths->{ports_select_count}->fetchrow_array();
 	$q = $sths->{ports_select};
+    }
+
+    if ($total_ports < 1) {
+	print STDERR "Nothing to build, invalid restrict_* settings ?\n";
+	return 0;
     }
 
     while(@ports = $q->fetchrow_array()) {
@@ -389,7 +394,7 @@ sub BuildPort
     }
     print "($total_ports) Build done: new $new, up. $up, "
         . "bump(ver) $bump / rej. $rej, meta $meta, dup. $dup\n";
-    return 1;
+    return $rc;
 }
 
 1;
