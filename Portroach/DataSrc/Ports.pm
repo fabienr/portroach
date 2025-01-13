@@ -284,61 +284,136 @@ sub BuildPort
 
 	debug(__PACKAGE__, $port, "pkg $pkgname: ".
 	    "distfile $distfile, distname $distname");
-	if ($distname =~ /\d/) {
-		my $name_q;
-		$ver = $distname;
-		$name_q = quotemeta $name;
 
-		$name_q =~ s/^(node|p5|mod|py|ruby|hs)(?:[\-\_])/($1\[\\-\\_\])?/;
-
-		# XXX: fix me
-		my $chop =
-			'sources?|bin|src|snapshot|freebsd\d*|freebsd-?\d\.\d{1,2}|'
-			. 'linux|unstable|elf|i\d86|x86|sparc|mips|linux-i\d86|html|'
-			. 'en|en_GB|en_US|full-src|orig|setup|install|export|'
-			. 'fbsd[7654]\d{1,2}|export|V(?=\d)';
-
-		foreach (split '\|', $chop) {
-			unless ($name =~ /($_)/i) {
-				$ver =~ s/[\.\-\_]?($chop)$//gi;
-				$ver =~ s/^($chop)[\.\-\_]?//gi;
-			}
-		}
-
-		unless ($ver =~ s/.*$name_q[-_\.]//i) {
-			# Resort to plan B
-			if ($ver =~ /^(.*)-(.*)$/) {
-				$ver = $2;
-			} elsif ($name !~ /\d/) {
-				$ver =~ s/^\D*(\d.*)$/$1/;
-			}
-		}
-
-		# Sanity check, if $ver doesn't match what matched the common
-		# case, fix it up. Prevents recording '-core-2.1' as version.
-		if ($distname =~ /^(.*)-(\d[^-]*)$/) {
-		    if ($ver ne $2) {
-			$name = $1;
-			$ver = $2;
-		    }
-		}
-
-		# If the $name is digits-only, try harder to make something
-		# sensible from it.
-		if ($name =~ /^\d*$/) {
-			if ($distname =~ /^(.*)-(\d[^-]*)[-]?(\w*)(.*)$/) {
-				$name = $1;
-				$ver = $2;
-			}
-		}
+	my $lang_re = '(node|p5|mod|py|ruby|hs)';
+	$basename_q = $basename;
+	debug(__PACKAGE__, $port, "basename optional [-_.] "
+	    . "$basename -> $basename_q")
+	    if ($basename_q =~ s/[\-\_\.]/\.?/g);
+	debug(__PACKAGE__, $port, "basename $basename -> $basename_q")
+	    if ($basename_q =~ /^$lang_re.+/ &&
+	        $basename_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
+	if ($basename ne $pathname) {
+		$pathname_q = $pathname;
+		debug(__PACKAGE__, $port, "pathname optional [-_.] "
+		    . "$pathname -> $pathname_q")
+		    if ($pathname_q =~ s/[\-\_\.]/\.?/g);
+		debug(__PACKAGE__, $port, "pathname $pathname -> $pathname_q")
+		    if ($pathname_q =~ /^$lang_re.+/ &&
+		    $pathname_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
 	}
 
+	foreach my $verdist ($distfile, $distname) {
+		if ($verdist !~ /\d/) {
+			debug(__PACKAGE__, $port, "skip, no digit in $verdist");
+			next;
+		}
+
+		debug(__PACKAGE__, $port, "extract version from $verdist");
+		$ver = $versrc = $verdist;
+
+		debug(__PACKAGE__, $port, "trim .ext -> $ver")
+		    if ($ver =~ s/(?:$ext_regex)$//i);
+
+		debug(__PACKAGE__, $port, "trim path -> $ver")
+		    if ($ver =~ s/.*\///g);
+
+		# Remove names from pkgname/fullpkgpath, prefix & suffix
+		my @name_q;
+		if ($basename ne $pathname) {
+			# On conflict, try longest matche first
+			if (index($pathname, $basename) != -1) {
+				@name_q = ($pathname_q, $basename_q);
+			} else {
+				@name_q = ($basename_q, $pathname_q);
+			}
+		} else {
+			@name_q = ($basename_q,);
+		}
+		foreach my $q (@name_q) {
+			# Remove prefix / suffix
+			debug(__PACKAGE__, $port, ".*$q\[-_.] * -> $ver")
+			    if ($ver =~ s/^.*($q[-_\.])//i);
+			debug(__PACKAGE__, $port, "* [-_.]$q.* -> $ver")
+			    if ($ver =~ s/([-_\.]$q).*$//i);
+
+			# Try harder, remove prefix with no separator
+			# XXX could be shorter
+			debug(__PACKAGE__, $port, ".*$q \\d.\\d... -> $ver")
+			    if ($ver =~ s/^.*($q)(\d+\.\d+[\w\d\.]*)$/$2/i);
+			debug(__PACKAGE__, $port, ".*$q \\d_\\d... -> $ver")
+			    if ($ver =~ s/^.*($q)(\d+\_\d+[\w\d\_]*)$/$2/i);
+			debug(__PACKAGE__, $port, ".*$q \\d-\\d... -> $ver")
+			    if ($ver =~ s/^.*($q)(\d+\-\d+[\w\d\-]*)$/$2/i);
+		}
+
+		# Remove common suffix
+		my @chops = ('src', 'source', 'release', 'orig', 'bin', 'dist',
+		    'image', 'rpm', '(noarch|linux|darwin)(-(x86(_64)?|x64))?');
+		foreach my $chop (@chops) {
+			next if ($name =~ /($chop)/i);
+			next unless ($ver =~ /($chop)/i);
+			$ver =~ s/[\.\-\_]?($chop)$//gi;
+			debug(__PACKAGE__, $port, "trim $chop -> $ver");
+		}
+
+		# Remove all '-' prefix, most common cases
+		if ($ver =~ /^(\D[^-]*-)+(.*)$/) {
+			$ver = $2;
+			debug(__PACKAGE__, $port,
+			    "trim \\D...- -> $ver");
+		}
+		# Try harder, match digit-nodigit-version
+		if ($ver =~ /^(\d[^-]*-)(\D[^-]*-)+(.*)$/) {
+			$ver = $3;
+			debug(__PACKAGE__, $port,
+			    "trim \\d...-\\D...- -> $ver");
+		}
+
+		# Remove everything up to the first version-like digits,
+		# only if name does not contain any digit.
+		# XXX FIXME comments / code differ a bit -> code adjustment
+		debug(__PACKAGE__, $port, "no digit, trim \\D -> $ver")
+		    if ($name !~ /\d/ && $ver =~ /\d+[\.\-\_]\d/ &&
+		    $ver =~ s/^\D+(\d.*)$/$1/);
+
+		# Remove common prefix version marker
+		debug(__PACKAGE__, $port, "trim (v...|r...) -> $ver")
+		    if ($ver =~ s/^(v|ver|r|rel|release)[-\._]?([0-9])/$2/i);
+
+		# Bruteforce, remove uncommon separator prefix
+		# XXX maybe merge this with '-' and use a foreeach $sep
+		debug(__PACKAGE__, $port, "trim \\D...(.|_) -> $ver")
+		    if ($ver =~ s/^(\D[^\._]*(\.|_))+(.*)$/$3/);
+
+		# Finally, check we got something plausible
+		# XXX discard HASH for now (isbeta ? new commit = new version)
+		if ($ver =~ /[;=\?\[\]\(\)#]/ || ($ver !~ /^$date_regex$/i &&
+		    $ver =~ /^[0-9a-f]{10,40}$/)) {
+			debug(__PACKAGE__, $port, 
+			    "discard invalid version $ver");
+			$ver = undef;
+			next;
+		}
+		# Valid version are date, single number or two digits schema
+		if ($ver !~ /^$date_regex$/i &&
+		    $ver !~ /^\d+$/i &&
+		    $ver !~ /^\d+[\.\-\_]\d+/) {
+			debug(__PACKAGE__, $port, 
+			    "discard unknow version format $ver");
+			$ver = undef;
+			next;
+		}
+
+		last if ($ver);
+	}
 	unless ($ver) {
 		$ver = $versrc = $pkgname;
 		$ver =~ s/^(.*)-([^-]*)$/$2/g;
 		debug(__PACKAGE__, $port, 
 		    "fallback on pkgname version $ver");
 	}
+	debug(__PACKAGE__, $port, "$versrc -> $ver");
 
 	my $rc = $ps->AddPort({
 	    'name'        => $name,
