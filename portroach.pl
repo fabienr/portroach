@@ -771,12 +771,8 @@ sub VersionCheck
 					next;
 				}
 
-				foreach (
-					verguess(
-						$port->{newver} ? $port->{newver} : $port->{ver},
-						$port->{limitwhich}
-					)
-				) {
+				# XXX $port->{newver} ? $port->{newver} : $port->{ver}
+				foreach (verguess($port->{ver}, $port->{limitwhich})) {
 					my $guess_v = $_;
 					my $old_v   = quotemeta $port->{ver};
 					my $s       = quotemeta $port->{sufx};
