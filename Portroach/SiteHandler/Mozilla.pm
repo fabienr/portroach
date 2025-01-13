@@ -122,8 +122,8 @@ sub GetFiles
 	    $resp->decoded_content =~ /href="([\w\d\.-]+\.source\.tar\.(bz2|xz))"/;
 	    push(@$files, "$query$1");
 	} else {
-	    info(1, $port->{fullpkgpath}, strchop($query, $60)
-	        . ": $resp->status_line");
+	    info(1, $port->{fullpkgpath}, strchop($query, 60)
+	        . ': ' . $resp->status_line);
 	    return 0;
 	}
 

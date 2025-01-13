@@ -112,8 +112,8 @@ sub GetFiles
 		my $gem_file = $gem . '-' . $latest->{version} . '.gem';
 		push @$files, $gem_file;
 	} else {
-	    info(1, $port->{fullpkgpath}, strchop($query, $60)
-	        . ": $resp->status_line");
+	    info(1, $port->{fullpkgpath}, strchop($query, 60)
+	        . ': ' . $resp->status_line);
 	    return 0;
 	}
 

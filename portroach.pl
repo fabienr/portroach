@@ -727,8 +727,8 @@ sub VersionCheck
 					}
 				}
 			} else {
-				info(1, $port->{fullpkgpath}, strchop($site, $60)
-				    . ": $response->status_line");
+				info(1, $port->{fullpkgpath}, strchop($site, 60)
+				    . ': ' . $response->status_line);
 			}
 
 			# No files found - try some guesses

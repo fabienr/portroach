@@ -111,8 +111,8 @@ sub GetFiles
 	    my $dl = "http://download.pear.php.net/package/" . $package . "-" . $latest . ".tgz";
 	    push @$files, $dl;
 	} else {
-	    info(1, $port->{fullpkgpath}, strchop($query, $60)
-	        . ": $resp->status_line");
+	    info(1, $port->{fullpkgpath}, strchop($query, 60)
+	        . ': ' . $resp->status_line);
 	    return 0;
 	}
 
