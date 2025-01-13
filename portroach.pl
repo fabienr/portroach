@@ -667,13 +667,11 @@ sub VersionCheck
 				next;
 			}
 
-			my ($ua, $response);
+			my ($ua, $resp);
 
-			$ua = LWP::UserAgent->new;
-			$ua->agent(USER_AGENT);
-			$ua->timeout($settings{http_timeout});
+			$ua = lwp_useragent();
 
-			$response = $ua->get($site);
+			$resp = $ua->get($site);
 
 			# A 404 here ought to imply that the distfile
 			# is unavailable, since we expect it to be
@@ -681,8 +679,8 @@ sub VersionCheck
 			# use scripts or rewrite rules disguised as
 			# directories.
 
-			if ($response->is_success) {
-				extractfilenames($response->content, $port->{sufx},
+			if ($resp->is_success) {
+				extractfilenames($resp->content, $port->{sufx},
 					\@files, \@dates);
 
 				if (@files && $path_ver) {
@@ -696,10 +694,10 @@ sub VersionCheck
 					uri_lastdir($site, undef);
 					$path = $site->path;
 
-					$response = $ua->get($site);
+					$resp = $ua->get($site);
 
-					extractdirectories($response->content, \@dirs)
-						if ($response->is_success);
+					extractdirectories($resp->content, \@dirs)
+						if ($resp->is_success);
 
 					# Investigate sibling version dirs
 
@@ -709,14 +707,14 @@ sub VersionCheck
 							my @files_tmp;
 
 							$site->path("$path$dir");
-							$response = $ua->get($site);
+							$resp = $ua->get($site);
 
 							extractfilenames(
-								$response->content,
+								$resp->content,
 								$port->{sufx},
 								\@files_tmp,
 								\@dates
-							) if ($response->is_success);
+							) if ($resp->is_success);
 
 							debug(__PACKAGE__, $port,
 							    "push $path$dir/$_")
@@ -728,19 +726,14 @@ sub VersionCheck
 				}
 			} else {
 				info(1, $port->{fullpkgpath}, strchop($site, 60)
-				    . ': ' . $response->status_line);
+				    . ': ' . $resp->status_line);
 			}
 
 			# No files found - try some guesses
 			if (!@files && !$port->{indexsite})
 			{
-				my (%headers, $ua, $response, $url);
-
+				my (%headers, $url);
 				my $bad_mimetypes = 'html|text|css|pdf|jpeg|gif|png|image|mpeg|bitmap';
-
-				$ua = LWP::UserAgent->new;
-				$ua->agent(USER_AGENT);
-				$ua->timeout($settings{http_timeout});
 
 				$url = $site;
 				$url .= '/' unless $url =~ /\/$/;
@@ -756,11 +749,11 @@ sub VersionCheck
 
 				# Verify site gives an error for bad filenames
 
-				$response = $ua->head($url.randstr(8).'_shouldntexist.tar.gz');
-				%headers  = %{$response->headers};
+				$resp = $ua->head($url.randstr(8).'_shouldntexist.tar.gz');
+				%headers  = %{$resp->headers};
 
 				# Got a response which wasn't HTTP 4xx -> bail out
-				if ($response->is_success && $response->status_line !~ /^4/) {
+				if ($resp->is_success && $resp->status_line !~ /^4/) {
 					info(1, $k, $host, 'Not doing any guessing; site is lieing to us.');
 					$sths->{sitedata_initliecount}->execute($sitedata->{host})
 						unless($settings{precious_data});
@@ -832,10 +825,10 @@ sub VersionCheck
 							}
 						}
 
-						my $response = $ua->head($url.$distfile);
-						my %headers  = %{$response->headers};
+						$resp = $ua->head($url.$distfile);
+						%headers  = %{$resp->headers};
 
-						if ($response->is_success && $response->status_line =~ /^2/ &&
+						if ($resp->is_success && $resp->status_line =~ /^2/ &&
 								$headers{'content-type'} !~ /($bad_mimetypes)/i) {
 							info(0, $k, $host, "UPDATE $port->{ver} -> $guess_v");
 
