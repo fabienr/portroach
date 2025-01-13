@@ -145,11 +145,6 @@ $sql{portdata_insert} =
                  pcfg_comment, homepage, method, basepkgpath, fullpkgpath)
 	  VALUES (?,?,?,?,?,?,?,?,?,?,?,0,?,?));
 
-$sql{sqlports_fullpkgpaths_by_maintainer} =
-    q(SELECT fullpkgpath
-	FROM RoachData
-	WHERE MAINTAINER LIKE ?);
-
 $sql{sqlports_count_ports} =
     q(SELECT COUNT(FULLPKGPATH) FROM RoachData);
 

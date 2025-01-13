@@ -104,35 +104,21 @@ sub BuildDB
 
 	my ($sdbh) = @_;
 
-	my (%sths, $dbh, %portsmaintok, $num_ports, $got_ports, $buildtime, %ssths);
+	my (%ssths, %sths, $dbh, $ps, $num_ports, $buildtime);
 
-	my $ps = Portroach::API->new;
-
-	$got_ports = 0;
+	$dbh = connect_db();
+	$ps = Portroach::API->new;
 	$num_ports = 0;
 	$buildtime = time;
 
-	$dbh = connect_db();
-
+	# first need to create view before any other prepare statement
 	prepare_sql($sdbh, \%ssths, qw(create_view));
 	$ssths{create_view}->execute or die DBI->errstr;
-	prepare_sql($sdbh, \%ssths, qw(sqlports_count_ports sqlports_fullpkgpaths_by_maintainer));
-
-	if ($settings{restrict_maintainer}) {
-		print "Querying for maintainer associations...\n";
-
-		$ssths{sqlports_fullpkgpaths_by_maintainer}->execute("%".$settings{restrict_maintainer}."%")
-		    or die DBI->errstr;
-	        my @ports_by_maintainer;
-		while(@ports_by_maintainer = $ssths{sqlports_fullpkgpaths_by_maintainer}->fetchrow_array()) {
-		    my $port = tobasepkgpath($ports_by_maintainer[0]);
-		    $portsmaintok{$port} = $settings{restrict_maintainer};
-		}
-	}
 
 	# Query SQLports for all the information we need. We don't care about
 	# restrictions for now as this step basically copies sqlports. Check()
 	# will handle any restrictions instead.
+	prepare_sql($sdbh, \%ssths, qw(sqlports_count_ports));
 	$ssths{sqlports_count_ports}->execute or die DBI->errstr;
 	$num_ports = $ssths{sqlports_count_ports}->fetchrow_array();
 
