@@ -1852,7 +1852,8 @@ sub MailMaintainers
 			$sths{portdata_findnewnew}->execute("%<${addr}>%");
 
 			while (my $port = $sths{portdata_findnewnew}->fetchrow_hashref) {
-				$sths{portdata_setmailed}->execute($port->{newver}, $port->{basepkgpath});
+				$sths{portdata_setmailed}->execute(
+				    $port->{newver}, $port->{fullpkgpath});
 			}
 		}
 	}
