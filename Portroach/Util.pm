@@ -104,12 +104,12 @@ $date_regex  = '(?<!\d)\d{2,4}([\-\.]?)(?:\d{2}|'.$month_regex.')\1'
     . '\d{2,4}(?!\d)';
 
 %beta_types = (
-	snapshot   => { re => 'svn|cvs|snap(?:shot)?', rank => 1 },
-	unstable   => { re => 'unstable|dev|test',     rank => 2 },
-	alpha      => { re => 'alpha|a(?=\d+|$)',      rank => 3 },
-	beta       => { re => 'beta|b(?=\d+|$)',       rank => 4 },
-	prerelease => { re => 'pre.*?|p(?=\d+|$)',     rank => 5 },
-	relcand    => { re => 'rc|r(?=\d+|$)',         rank => 6 }
+	snapshot   => { re => 'svn|cvs|snap(?:shot)?|nightly',	rank => 1 },
+	unstable   => { re => 'unstable|dev|test',		rank => 2 },
+	alpha      => { re => 'alpha|a(?=\d+|$)',		rank => 3 },
+	beta       => { re => 'beta|b(?=\d+|$)',		rank => 4 },
+	prerelease => { re => 'pre.*?|p(?=\d+|$)',		rank => 5 },
+	relcand    => { re => 'rc|r(?=\d+|$)',			rank => 6 }
 );
 
 $beta_regex = join '|', map +($beta_types{$_}->{re}), keys %beta_types;
