@@ -213,12 +213,10 @@ $sql{sitedata_exists} =
 
 $sql{sitedata_select} =
 	q(SELECT host, robots, robots_paths, liecount, type,
-	         (CURRENT_TIMESTAMP >= robots_nextcheck) AS robots_outofdate,
-	         abs(successes + (5*failures)) AS _w
+	         (CURRENT_TIMESTAMP >= robots_nextcheck) AS robots_outofdate
 	    FROM sitedata
-	   WHERE position(host in ?) > 0
-	     AND ignore is not true
-	ORDER BY _w ASC);
+	   WHERE host = ?
+	     AND ignore is not true);
 
 $sql{sitedata_failure} =
 	q(UPDATE sitedata

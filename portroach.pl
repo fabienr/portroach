@@ -463,19 +463,29 @@ sub VersionCheck
 	info(1, $k, 'VersionCheck()');
 
 	# Loop through master sites
-	$sths->{sitedata_select}->execute($port->{mastersites});
-
-	while (my $sitedata = $sths->{sitedata_select}->fetchrow_hashref)
+	foreach my $site (split ' ', $port->{mastersites})
 	{
-		my (@files, @dates, $site, $path_ver, $new_found, $old_found);
+		my (@files, @dates, $sitedata,$path_ver,$new_found,$old_found);
 		my $method = METHOD_LIST;
-		my $host = $sitedata->{host};
+
+		my $host = URI->new($site)->host;
+		$sths->{sitedata_select}->execute($host);
+		while (my $data = $sths->{sitedata_select}->fetchrow_hashref) {
+			print STDERR "$port->{fullpkgpath}: multiple sitedata "
+			    . "for $host, $sitedata->{host} already defined.\n"
+			    if ($sitedata);
+			debug(__PACKAGE__, $port, "sitedata $data->{host}");
+			$sitedata = $data;
+		}
+		$sths->{sitedata_select}->finish;
+		if (!$sitedata) {
+			print STDERR "$port->{fullpkgpath}: "
+			    . "sitedata $host not found, ignore ?.\n";
+			next;
+		}
 
 		$old_found = 0;
 		$new_found = 0;
-
-		$site = (grep /:\/\/\Q$sitedata->{host}\E\//, (split ' ', $port->{mastersites}))[0]
-			or next;
 
 		$site = URI->new($site)->canonical;
 
