@@ -268,10 +268,7 @@ sub AddPort
 		my (%pcfg);
 
 		foreach my $var (keys %{$port->{options}}) {
-			my ($val, $fullport);
-
-			$val = $port->{options}->{$var};
-			$fullport = "$port->{cat}/$port->{name}";
+			my $val = $port->{options}->{$var};
 
 			if ($var !~ /^[A-Za-z]+$/i) {
 				print STDERR "$port->{fullpkgpath}: "
