@@ -48,8 +48,8 @@ our %sql;
 # SQL that is common to all supported database engines.
 #------------------------------------------------------------------------------
 
-$sql{portdata_getinfo} =
-	q(SELECT ver, distname, name, cat
+$sql{portdata_get} =
+	q(SELECT *
 	    FROM portdata
 	   WHERE fullpkgpath = ?);
 

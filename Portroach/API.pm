@@ -63,7 +63,7 @@ sub new
 		$self->{dbh},
 		$self->{sths},
 		qw(portdata_exists portdata_update portdata_insert
-		    sitedata_exists sitedata_insert portdata_getinfo
+		    sitedata_exists sitedata_insert portdata_get
 		    portdata_dedup portdata_getnewver portdata_clearnewver
 		    portconfig_update portconfig_isstatic)
 	);
@@ -85,7 +85,7 @@ sub new
 #                    distfile    - Site's filename.                  (required)
 #                    sites       - Array of sites to find files      (required)
 #                    distname    - "distname" (as in ports)
-#                    suffix      - Distfile suffix (e.g. ".tar.gz")
+#                    sufx        - Distfile suffix (e.g. ".tar.gz")
 #                    comment     - Description of port
 #                    options     - Hash of port options, from "PORTROACH" var.
 #                    pcfg_comment  - Explanation for PORTROACH(PORTROACH_COMMENT)
@@ -140,7 +140,7 @@ sub AddPort
 	# Optional fields
 
 	$port->{distname}     ||= '';
-	$port->{suffix}       ||= '';
+	$port->{sufx}         ||= '';
 	$port->{comment}      ||= '';
 	$port->{options}      ||= {};
 	$port->{pcfg_comment} ||= '';
@@ -157,8 +157,8 @@ sub AddPort
 
 	# Add/Update port to database
 
-	$sths->{portdata_getinfo}->execute($port->{fullpkgpath});
-	$oldport = $sths->{portdata_getinfo}->fetchrow_hashref;
+	$sths->{portdata_get}->execute($port->{fullpkgpath});
+	$oldport = $sths->{portdata_get}->fetchrow_hashref;
 
 	# Check for required field ver
 
@@ -186,7 +186,7 @@ sub AddPort
 
 		# Regress on unwanted changes (same distname)
 		# XXX ideally s/distname/pkgname/, not yet in DB
-		foreach my $v ("ver", "name", "cat") {
+		foreach my $v ("ver", "name", "cat", "sufx") {
 			last if (!$samedist);
 			next unless ($port->{$v} ne $oldport->{$v});
 			regress($port->{fullpkgpath}, "same distname, $v "
@@ -218,7 +218,7 @@ sub AddPort
 				$port->{cat},
 				$port->{distfile},
 				$port->{distname},
-				$port->{suffix},
+				$port->{sufx},
 				$_sites,
 				$port->{maintainer},
 			        $port->{pcfg_comment},
@@ -248,7 +248,7 @@ sub AddPort
 				$port->{ver},
 				$port->{comment},
 				$port->{distfile},
-				$port->{suffix},
+				$port->{sufx},
 				$_sites,
 			    	$port->{maintainer},
 			    	$port->{pcfg_comment},

@@ -422,7 +422,7 @@ sub BuildPort
 	    'maintainer'  => $maintainer,
 	    'comment'     => $comment,
 	    'distname'    => $distname,
-	    'suffix'      => $sufx,
+	    'sufx'        => $sufx,
 	    'distfile'    => $distfile,
 	    'sites'       => \@sites,
 	    'options'     => \%pcfg,
