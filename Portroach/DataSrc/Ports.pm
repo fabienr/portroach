@@ -348,8 +348,11 @@ sub BuildPort
 		}
 
 		# Remove common suffix
-		my @chops = ('src', 'source', 'release', 'orig', 'bin', 'dist',
-		    'image', 'rpm', '(noarch|linux|darwin)(-(x86(_64)?|x64))?');
+		my @chops = (
+		    'src', 'source', 'release', 'orig', 'bin', 'dist', 'image',
+		    'rpm', 'utf-8',
+		    '(noarch|linux|darwin)(-(x86(_64)?|x64))?'
+		);
 		foreach my $chop (@chops) {
 			next if ($name =~ /($chop)/i);
 			next unless ($ver =~ /($chop)/i);
