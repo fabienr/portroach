@@ -76,6 +76,7 @@ my (@paths, %settings_types, $bool_opts);
 	mastersite_limit	=> 4,
 	mastersite_ignore	=> '',
 	oldfound_enable 	=> 1,
+	newfound_enable 	=> 1,
 
 	restrict_maintainer => '',
 	restrict_category   => '',

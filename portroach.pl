@@ -302,10 +302,16 @@ sub Check
 	$sths{portdata_select}->execute(lc hostname());
 
 	if ($nofork) {
-		prepare_sql($dbh, \%sths,
-			qw(portdata_setchecked portdata_setnewver
-			   portdata_setmethod sitedata_select sitedata_failure
-			   sitedata_success sitedata_initliecount
+		prepare_sql($dbh, \%sths, qw(
+			portdata_setchecked
+			portdata_setnewver
+			portdata_fixnewver
+			portdata_resetnewver
+			portdata_setmethod
+			sitedata_select
+			sitedata_failure
+			sitedata_success
+			sitedata_initliecount
 			   sitedata_decliecount)
 		);
 	}
@@ -351,9 +357,11 @@ sub Check
 
 				$dbh = connect_db(1);
 
-				prepare_sql($dbh, \%sths,
-					qw(portdata_setchecked
+				prepare_sql($dbh, \%sths, qw(
+					portdata_setchecked
 					   portdata_setnewver
+					portdata_fixnewver
+					portdata_resetnewver
 					   portdata_setmethod
 					   sitedata_select
 					   sitedata_failure
@@ -440,8 +448,9 @@ sub VersionCheck
 {
 	my ($dbh, $sths, $port) = @_;
 
-	my ($k, $i);
+	my ($found, $k, $i);
 
+	$found = 0;
 	$k = $port->{fullpkgpath};
 	$i = 0;
 
@@ -812,6 +821,7 @@ sub VersionCheck
 							) unless ($settings{precious_data});
 
 							$new_found = 1;
+							$found = 2 if ($new_found);
 							last;
 						} else {
 							info(1, $k, $host, "Guess failed $port->{ver} -> $guess_v");
@@ -839,6 +849,7 @@ sub VersionCheck
 				$method,
 				$port->{id}
 			) unless ($settings{precious_data});
+			$found = 1 if (!$found); # $old_found = 1
 		}
 		next if (!@files);
 
@@ -849,8 +860,9 @@ sub VersionCheck
 		my $file = FindNewestFile($port, $site, \@files);
 
 		$old_found = 1 if $file->{oldfound};
+		$new_found = 1 if $file->{newfound};
 
-		if ($file && $file->{newfound}) {
+		if ($new_found && $file->{version} ne $port->{newver}) {
 			info(0, $k, $host,
 			    "UPDATE $port->{ver} -> $file->{version}");
 			$sths->{portdata_setnewver}->execute(
@@ -860,7 +872,38 @@ sub VersionCheck
 				$port->{id}
 			) unless ($settings{precious_data});
 
-			last;
+		} elsif ($new_found && (
+		    $file->{url} ne $port->{newurl} ||
+		    $method != $port->{method})) {
+			regress($k, $host,
+			    "url '$port->{newurl}' -> '$file->{url}'")
+			    if ($file->{url} != $port->{newurl});
+			regress($k, $host,
+			    "method $port->{method} -> $method")
+			    if ($method != $port->{method});
+			$sths->{portdata_fixnewver}->execute(
+				$method,
+				$file->{url},
+				$port->{id}
+			) unless ($settings{precious_data} ||
+			    !$settings{regress});
+
+		} elsif ($new_found) {
+			info(1, $k, $host, "STILL new, method $method");
+
+		} elsif ($old_found && $port->{method} &&
+		    $method != $port->{method}) {
+			regress($k, $host,
+			    "method $port->{method} -> $method");
+			$sths->{portdata_setmethod}->execute(
+				$method,
+				$port->{id}
+			) unless ($settings{precious_data} ||
+			    !$settings{regress});
+
+		} elsif ($old_found && $port->{method}) {
+			info(1, $k, $host, "STILL old, method $method");
+
 		} elsif ($old_found) {
 			info(0, $k, $host, "FOUND old, method -> $method");
 			$sths->{portdata_setmethod}->execute(
@@ -869,6 +912,9 @@ sub VersionCheck
 			) unless ($settings{precious_data});
 		}
 
+		$found = 1 if ($old_found && !$found);
+		$found = 2 if ($new_found);
+		last if ($new_found && $settings{newfound_enable});
 		last if ($old_found && $settings{oldfound_enable});
 	}
 
@@ -876,7 +922,30 @@ sub VersionCheck
 	$sths->{portdata_setchecked}->execute($port->{id})
 		unless ($settings{precious_data});
 
+	if ($found != 2 && $port->{newver}) {
+		regress($k, "newver not found($found): "
+		    . "old $port->{ver}, new $port->{newver}, "
+		    . "method $port->{method}");
+		$sths->{portdata_resetnewver}->execute(
+			$port->{id}
+		) unless ($settings{precious_data} ||
+		    !$settings{regress});
+		return;
+	} elsif (!$found && $port->{method}) {
+		regress($k, "not found: old $port->{ver}, "
+		    . "method $port->{method}");
+		$sths->{portdata_setmethod}->execute(
+		    0, $port->{id}
+		) unless ($settings{precious_data} ||
+		    !$settings{regress});
+		return;
+	}
+
+	if (!$found) {
+		info(0, $k, "*** not found: $port->{ver}");
+	} else {
 	info(1, $k, 'Done');
+	}
 }
 
 

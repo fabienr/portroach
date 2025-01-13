@@ -190,6 +190,17 @@ $sql{portdata_setnewver} =
 	         discovered = CURRENT_TIMESTAMP
 	   WHERE id = ?);
 
+$sql{portdata_fixnewver} =
+	q(UPDATE portdata
+	     SET method = ?, newurl = ?
+	   WHERE id = ?);
+
+$sql{portdata_resetnewver} =
+	q(UPDATE portdata
+	     SET newver = NULL, method = NULL, newurl = NULL,
+	         discovered = NULL
+	   WHERE id = ?);
+
 $sql{portdata_setmethod} =
 	q(UPDATE portdata
 	     SET method = ?

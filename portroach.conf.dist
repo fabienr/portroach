@@ -93,7 +93,9 @@ mastersite limit = 4         				# Give up after this many sites
 # Items in the list may contain * and ? wildcard characters.
 mastersite ignore = *openbsd.org/pub/OpenBSD/distfiles/*
 
-oldfound enable  = true      				# Stop if curr. distfile found
+# Stop checking other site if old/new version are found, default to true
+#oldfound enable	= false
+#newfound enable	= false
 
 precious data		= false	# Don't write anything to database
 #regress		= true	# Override database on regression (--regress)
