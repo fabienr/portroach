@@ -847,6 +847,11 @@ sub fullpkgpathtoport
     $port =~ s/\/[\d\.]+(\/|$)/$1/g;
     $port =~ s/.*\///g;
 
+    # Remove -V marker, either nameD or name/V or long-name-V.
+    # XXX devel/libsigc++-2
+    # XXX x11/kde-plasma/polkit-kde-agent-1
+    $port =~ s/^([^\-]+)\-\d+$/$1/;
+
     return $port;
 }
 
