@@ -114,9 +114,11 @@ $date_regex  = '(?<!\d)\d{2,4}([\-\.]?)(?:\d{2}|'.$month_regex.')\1'
 
 $beta_regex = join '|', map +($beta_types{$_}->{re}), keys %beta_types;
 
-$ext_regex = '(\.tar|\.shar)?\.(bz2|(t?g|l|t?x|tb)?z|zst)|'
-    . '\.tar|\.shar|\.jar|\.tgz|\.zip|\.pdf|\.gem|\.otf|\.rpm|'
-    . '(\.langpack)?\.xpi|\.uqm|\.dictd|\.kar|\.war|\.spl|\.exe';
+$ext_regex = '(\.tar|\.shar)?\.((l|t?b|t?g|t?x)?z(2|st)?)|'
+    . '(\.langpack)?\.xpi|\.pl(\.uu|\.txt)?|'
+    . '\.bin|\.c|\.dictd|\.dtd|\.exe|\.F90|\.gem|\.ins|\.jar|\.kar|\.mp3|\.otf|'
+    . '\.pdf|\.phar|\.rar|\.rpm|\.run|\.sfc|\.shar|\.spl|\.tar|\.tgz|\.ttf|'
+    . '\.txi|\.txt|\.uqm|\.war|\.zip';
 
 #------------------------------------------------------------------------------
 # Func: strchop()
