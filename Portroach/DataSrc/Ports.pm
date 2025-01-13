@@ -291,7 +291,11 @@ sub BuildPort
 	debug(__PACKAGE__, $port, "basename optional [-_.] "
 	    . "$basename -> $basename_q")
 	    if ($basename_q =~ s/[\-\_\.]/\.?/g);
-	debug(__PACKAGE__, $port, "basename $basename -> $basename_q")
+	debug(__PACKAGE__, $port, "basename optional + "
+	    . "$basename -> $basename_q")
+	    if ($basename_q =~ s/\+/\\\+?/g);
+	debug(__PACKAGE__, $port, "basename optional lang "
+	    . "$basename -> $basename_q")
 	    if ($basename_q =~ /^$lang_re.+/ &&
 	        $basename_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
 	if ($basename ne $pathname) {
@@ -299,7 +303,11 @@ sub BuildPort
 		debug(__PACKAGE__, $port, "pathname optional [-_.] "
 		    . "$pathname -> $pathname_q")
 		    if ($pathname_q =~ s/[\-\_\.]/\.?/g);
-		debug(__PACKAGE__, $port, "pathname $pathname -> $pathname_q")
+		debug(__PACKAGE__, $port, "pathname optional + "
+		    . "$pathname -> $pathname_q")
+		    if ($pathname_q =~ s/\+/\\\+?/g);
+		debug(__PACKAGE__, $port, "pathname optional lang "
+		    . "$pathname -> $pathname_q")
 		    if ($pathname_q =~ /^$lang_re.+/ &&
 		    $pathname_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
 	}
