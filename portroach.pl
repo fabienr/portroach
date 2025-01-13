@@ -738,6 +738,17 @@ sub VersionCheck
 				$url = $site;
 				$url .= '/' unless $url =~ /\/$/;
 
+				# Check distfile still exists
+				# XXX s/distfiles/distfile/
+				$resp = $ua->head($url.$port->{distfiles});
+				%headers  = %{$resp->headers};
+
+				unless ($resp->is_success && $resp->status_line =~ /^2/ &&
+					$headers{'content-type'} !~ /($bad_mimetypes)/i) {
+					info(1, $k, $host, 'Not doing any guess, distfile not found.');
+					next;
+				}
+
 				# We keep a counter of "lies" from each site, and only
 				# re-check every so often.
 				if ($sitedata->{liecount} > 0) {
