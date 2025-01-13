@@ -254,7 +254,8 @@ sub BuildPort
 	}
 	$pcfg_comment = $ports[8];
 	$homepage = $ports[9];
-	$sufx = extractsuffix($distfile);
+	info(1, $fullpkgpath, "SUFX? $distfile")
+	    unless ($sufx = extractsuffix($distfile));
 	foreach my $site (split /\s+/, $ports[4]) {
 		my $ignored = 0;
 

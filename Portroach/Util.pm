@@ -630,11 +630,8 @@ sub extractdirectories
 
 sub extractsuffix
 {
-	my ($sufx) = shift;
-	unless ($sufx =~ s/^(.*?)($ext_regex)$/$2/i) {
-		debug(__PACKAGE__, undef, "no suffix in $sufx");
-		return;
-	}
+	my $sufx = shift;
+	return unless ($sufx =~ s/^(.*?)($ext_regex)$/$2/i);
 	return $sufx;
 }
 
