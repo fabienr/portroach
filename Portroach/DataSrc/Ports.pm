@@ -297,7 +297,7 @@ sub BuildPort
 	    "distfile $distfile, distname $distname");
 
 	my $lang_re = '(node|p5|mod|py|ruby|hs)';
-	$basename_q = $basename;
+	$basename_q = lc $basename;
 	debug(__PACKAGE__, $port, "basename optional [-_.] "
 	    . "$basename -> $basename_q")
 	    if ($basename_q =~ s/[\-\_\.]/\.?/g);
@@ -307,9 +307,9 @@ sub BuildPort
 	debug(__PACKAGE__, $port, "basename optional lang "
 	    . "$basename -> $basename_q")
 	    if ($basename_q =~ /^$lang_re.+/ &&
-	        $basename_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
+	    $basename_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
 	if ($basename ne $pathname) {
-		$pathname_q = $pathname;
+		$pathname_q = lc $pathname;
 		debug(__PACKAGE__, $port, "pathname optional [-_.] "
 		    . "$pathname -> $pathname_q")
 		    if ($pathname_q =~ s/[\-\_\.]/\.?/g);
@@ -331,8 +331,11 @@ sub BuildPort
 		debug(__PACKAGE__, $port, "extract version from $verdist");
 		$ver = $versrc = $verdist;
 
+		# Alway start with lower case to ease further processing
+		$ver = lc $ver;
+
 		debug(__PACKAGE__, $port, "trim .ext -> $ver")
-		    if ($ver =~ s/($ext_regex)$//i);
+		    if ($ver =~ s/($ext_regex?)+$//);
 
 		debug(__PACKAGE__, $port, "trim path -> $ver")
 		    if ($ver =~ s/.*\///g);
@@ -352,18 +355,18 @@ sub BuildPort
 		foreach my $q (@name_q) {
 			# Remove prefix / suffix
 			debug(__PACKAGE__, $port, ".*$q\[-_.] * -> $ver")
-			    if ($ver =~ s/^.*($q[-_\.])//i);
+			    if ($ver =~ s/^.*($q[-_\.])//);
 			debug(__PACKAGE__, $port, "* [-_.]$q.* -> $ver")
-			    if ($ver =~ s/([-_\.]$q).*$//i);
+			    if ($ver =~ s/([-_\.]$q).*$//);
 
 			# Try harder, remove prefix with no separator
 			# XXX could be shorter
 			debug(__PACKAGE__, $port, ".*$q \\d.\\d... -> $ver")
-			    if ($ver =~ s/^.*($q)(\d+\.\d+[\w\d\.]*)$/$2/i);
+			    if ($ver =~ s/^.*($q)(\d+\.\d+[\w\d\.]*)$/$2/);
 			debug(__PACKAGE__, $port, ".*$q \\d_\\d... -> $ver")
-			    if ($ver =~ s/^.*($q)(\d+\_\d+[\w\d\_]*)$/$2/i);
+			    if ($ver =~ s/^.*($q)(\d+\_\d+[\w\d\_]*)$/$2/);
 			debug(__PACKAGE__, $port, ".*$q \\d-\\d... -> $ver")
-			    if ($ver =~ s/^.*($q)(\d+\-\d+[\w\d\-]*)$/$2/i);
+			    if ($ver =~ s/^.*($q)(\d+\-\d+[\w\d\-]*)$/$2/);
 		}
 
 		# Remove common suffix
@@ -405,7 +408,7 @@ sub BuildPort
 
 		# Finally, check we got something plausible
 		# XXX discard HASH for now (isbeta ? new commit = new version)
-		if ($ver =~ /[;=\?\[\]\(\)#]/ || ($ver !~ /^$date_regex$/i &&
+		if ($ver =~ /[;=\?\[\]\(\)#]/ || ($ver !~ /^$date_regex$/ &&
 		    $ver =~ /^[0-9a-f]{10,40}$/)) {
 			debug(__PACKAGE__, $port, 
 			    "discard invalid version $ver");
@@ -413,7 +416,7 @@ sub BuildPort
 			next;
 		}
 		# Valid version are date, single number or two digits schema
-		if ($ver !~ /^$date_regex$/i &&
+		if ($ver !~ /^$date_regex$/ &&
 		    $ver !~ /^\d+$/i &&
 		    $ver !~ /^\d+[\.\-\_]\d+/) {
 			debug(__PACKAGE__, $port, 
@@ -426,10 +429,13 @@ sub BuildPort
 	}
 	unless ($ver) {
 		$ver = $versrc = $pkgname;
+		# Alway start with lower case to ease further processing
+		$ver = lc $ver;
 		$ver =~ s/^(.*)-([^-]*)$/$2/g;
 		debug(__PACKAGE__, $port, 
 		    "fallback on pkgname version $ver");
 	}
+
 	debug(__PACKAGE__, $port, "$versrc -> $ver");
 
 	my $rc = $ps->AddPort({

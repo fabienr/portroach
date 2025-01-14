@@ -398,7 +398,7 @@ sub vercompare
 
 	# Give month names a numerical value
 
-	if ($new =~ /$month_regex/i) {
+	if ($new =~ /$month_regex/) {
 		my $i = 1;
 		foreach my $m (@months) {
 			$new =~ s/$m/sprintf "%02d", $i/gie;
@@ -406,7 +406,7 @@ sub vercompare
 		}
 	}
 
-	if ($old =~ /$month_regex/i) {
+	if ($old =~ /$month_regex/) {
 		my $i = 1;
 		foreach my $m (@months) {
 			$old =~ s/$m/sprintf "%02d", $i/gie;
