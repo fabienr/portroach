@@ -407,22 +407,10 @@ sub BuildPort
 		    if ($ver =~ s/^(\D[^\._]*(\.|_))+(.*)$/$3/);
 
 		# Finally, check we got something plausible
-		# XXX discard HASH for now (isbeta ? new commit = new version)
-		if ($ver =~ /[;=\?\[\]\(\)#]/ || ($ver !~ /^$date_regex$/ &&
-		    $ver =~ /^[0-9a-f]{10,40}$/)) {
+		unless (isversion($ver)) {
 			debug(__PACKAGE__, $port, 
 			    "discard invalid version $ver");
 			$ver = undef;
-			next;
-		}
-		# Valid version are date, single number or two digits schema
-		if ($ver !~ /^$date_regex$/ &&
-		    $ver !~ /^\d+$/i &&
-		    $ver !~ /^\d+[\.\-\_]\d+/) {
-			debug(__PACKAGE__, $port, 
-			    "discard unknow version format $ver");
-			$ver = undef;
-			next;
 		}
 
 		last if ($ver);

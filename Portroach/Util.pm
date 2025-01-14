@@ -49,6 +49,7 @@ our @EXPORT = qw(
 
 	&strchop
 	&emptydir
+	&isversion
 	&isbeta
 	&chopbeta
 	&verguess
@@ -189,6 +190,51 @@ sub emptydir
 	}
 
 	return 1;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: isversion()
+# Desc: Determine if a string looks like a valid version. If two strings are
+#       provided, also check they both have the same schema.
+#
+# Args: $version 1 - Version or full filename.
+#       $version 2 - Version or full filename.
+#
+# Retn: $isversion  - Looks like a version?
+#------------------------------------------------------------------------------
+
+sub isversion
+{
+	my $vera = shift;
+	my $verb = shift;
+
+	# XXX discard HASH for now ( new commit = new version ? )
+	if ($vera =~ /[;=\?\[\]\(\)#]/ || ($vera !~ /^$date_regex$/ &&
+		$vera =~ /^[0-9a-f]{10,40}$/)) {
+		return 0;
+	}
+	if ($verb =~ /[;=\?\[\]\(\)#]/ || ($verb !~ /^$date_regex$/ &&
+		$verb =~ /^[0-9a-f]{10,40}$/)) {
+		return 0;
+	}
+
+	# Valid version are date, single number or two digits schema
+	if ($vera =~ /^\d+[\.\-\_]\d+/) {
+		return 1 unless ($verb);
+		return 1 if ($verb =~ /^\d+[\.\-\_]\d+/);
+		return 0;
+	} elsif ($vera =~ /^$date_regex$/) {
+		return 1 unless ($verb);
+		return 1 if ($verb =~ /^$date_regex$/);
+		return 0;
+	} elsif ($vera =~ /^\d+$/) {
+		return 1 unless ($verb);
+		return 1 if ($verb =~ /^\d+$/);
+		return 0;
+	}
+
+	return 0;
 }
 
 
