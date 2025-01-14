@@ -33,7 +33,7 @@ use Portroach::Config;
 
 require Exporter;
 
-    use Data::Dumper;
+use Data::Dumper;
 
 use strict;
 
@@ -131,8 +131,8 @@ sub AddPort
 				. "wrong format for sites, "
 				. "should be an arrayref or single item.\n";
 			debug(__PACKAGE__, $port, Dumper($port));
-				return 0;
-			}
+			return 0;
+		}
 		$port->{sites} = [ $port->{sites} ];
 	}
 	$_sites = join(' ', @{$port->{sites}});
@@ -221,9 +221,9 @@ sub AddPort
 				$port->{sufx},
 				$_sites,
 				$port->{maintainer},
-			        $port->{pcfg_comment},
-			        $port->{homepage},
- 	  	  	        $port->{basepkgpath},
+				$port->{pcfg_comment},
+				$port->{homepage},
+				$port->{basepkgpath},
 				$port->{fullpkgpath}
 			) or die "Failed to execute: $DBI::errstr";
 		}
@@ -250,11 +250,11 @@ sub AddPort
 				$port->{distfile},
 				$port->{sufx},
 				$_sites,
-			    	$port->{maintainer},
-			    	$port->{pcfg_comment},
-			    	$port->{homepage},
-     	  	  	        $port->{basepkgpath},
- 	  	  	        $port->{fullpkgpath}
+				$port->{maintainer},
+				$port->{pcfg_comment},
+				$port->{homepage},
+				$port->{basepkgpath},
+				$port->{fullpkgpath}
 			) or die "Failed to execute: $DBI::errstr";
 		}
 	}
@@ -357,8 +357,8 @@ sub AddPort
 		$pcfg{ignore} = 0 if !exists($pcfg{ignore});
 
 		$sths->{portconfig_update}->execute(
-			$pcfg{indexsite}, $pcfg{limitver}, $pcfg{limiteven},
-			$pcfg{skipbeta}, $pcfg{skipversions}, $pcfg{limitwhich},
+		    $pcfg{indexsite}, $pcfg{limitver}, $pcfg{limiteven},
+		    $pcfg{skipbeta}, $pcfg{skipversions}, $pcfg{limitwhich},
 		    $pcfg{ignore}, $port->{fullpkgpath}
 		) if (!$settings{precious_data});
 
