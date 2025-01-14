@@ -44,6 +44,7 @@ our @EXPORT = qw(
 	$beta_regex
 	$month_regex
 	$ext_regex
+	$verprfx_regex
 
 	&strchop
 	&emptydir
@@ -81,9 +82,8 @@ our @EXPORT = qw(
 # Globals
 #------------------------------------------------------------------------------
 
-our %settings;
-
-our (@months, $date_regex, $beta_regex, $month_regex, $ext_regex);
+our (%settings, @months, $date_regex, $beta_regex, $month_regex, $ext_regex,
+    $verprfx_regex);
 
 my %beta_types;
 
@@ -119,6 +119,8 @@ $ext_regex = qr/
     \.bin|\.c|\.dictd|\.dtd|\.exe|\.F90|\.gem|\.ins|\.jar|\.kar|\.mp3|\.otf|
     \.pdf|\.phar|\.rar|\.rpm|\.run|\.sfc|\.shar|\.spl|\.tar|\.tgz|\.ttf|
     \.txi|\.txt|\.uqm|\.war|\.zip/xi;
+
+$verprfx_regex = qr/(?:v|ver|r|rel|release)[-\._]?(?=\d)/;
 
 #------------------------------------------------------------------------------
 # Func: strchop()

@@ -399,7 +399,7 @@ sub BuildPort
 
 		# Remove common prefix version marker
 		debug(__PACKAGE__, $port, "trim (v...|r...) -> $ver")
-		    if ($ver =~ s/^(v|ver|r|rel|release)[-\._]?([0-9])/$2/i);
+		    if ($ver =~ s/^$verprfx_regex//);
 
 		# Bruteforce, remove uncommon separator prefix
 		# XXX maybe merge this with '-' and use a foreeach $sep
