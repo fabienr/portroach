@@ -102,10 +102,11 @@ sub GetFiles
 
 	my ($url, $port, $files) = @_;
 
-	if ($url =~ /downloads\.sourceforge\.net\/sourceforge\/([^\/]*)\//) {
+	my $q = 'downloads\.sourceforge\.net\/sourceforge\/';
+	if ($url =~ /$q(project\/?)?([^\/]*)\//) {
 		my ($query, $projname, $ua, $resp, $xpath, $items);
 
-		$projname = $1;
+		$projname = $2;
 
 		# Find the RSS feed for this project.
 		$query = 'http://sourceforge.net/projects/'
