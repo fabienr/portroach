@@ -699,6 +699,7 @@ sub info
 	my @items = (@_);
 	my ($str, $msg);
 
+	# XXX should fit for non verbose msg ... or not
 	# width is diveded by 2 for eah @str
 	# use at most two: [---30---] [-15-] $msg
 	my $width = 30;
@@ -714,7 +715,7 @@ sub info
 	}
 
 	if ($str) {
-	print "$str $msg\n";
+		print "$str $msg\n";
 	} else {
 		print "$msg\n";
 	}
