@@ -312,7 +312,7 @@ sub Check
 			sitedata_failure
 			sitedata_success
 			sitedata_initliecount
-			   sitedata_decliecount)
+			sitedata_decliecount)
 		);
 	}
 
@@ -359,15 +359,15 @@ sub Check
 
 				prepare_sql($dbh, \%sths, qw(
 					portdata_setchecked
-					   portdata_setnewver
+					portdata_setnewver
 					portdata_fixnewver
 					portdata_resetnewver
-					   portdata_setmethod
-					   sitedata_select
-					   sitedata_failure
-					   sitedata_success
-					   sitedata_initliecount
-					   sitedata_decliecount)
+					portdata_setmethod
+					sitedata_select
+					sitedata_failure
+					sitedata_success
+					sitedata_initliecount
+					sitedata_decliecount)
 				);
 
 				while (my $port = pop @workblock) {
@@ -561,7 +561,7 @@ sub VersionCheck
 			if (!$ftp) {
 				info(1, $k, $host, "FTP connect problem: ".$@);
 				$sths->{sitedata_failure}->execute($site->host)
-					unless ($settings{precious_data});
+				    unless ($settings{precious_data});
 				next;
 			}
 
@@ -968,7 +968,7 @@ sub VersionCheck
 	if (!$found) {
 		info(0, $k, "*** not found: $port->{ver}");
 	} else {
-	info(1, $k, 'Done');
+		info(1, $k, 'Done');
 	}
 }
 
@@ -2143,7 +2143,7 @@ sub Prune
             $prune++;
             $sths{delete_removed}->execute($port->{id});
             info(0, $port->{fullpkgpath}, 'removed');
-	}
+        }
     }
     print "Prune done, $prune removed.\n";
     unless ($time) {
@@ -2155,7 +2155,7 @@ sub Prune
     $sths{portdata_outdate}->execute($time) or die $DBI::errstr;
     my $port = $sths{portdata_outdate}->fetchrow_hashref;
     unless ($port) {
-    $dbh->disconnect;
+        $dbh->disconnect;
         return 1;
     }
 
