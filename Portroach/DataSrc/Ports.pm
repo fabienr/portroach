@@ -367,17 +367,12 @@ sub BuildPort
 		}
 
 		# Remove common suffix
-		my @chops = ('all',
-		    'src', 'source', 'release', 'orig', 'bin', 'dist', 'image',
-		    'rpm', 'utf-8', 'plugin',
-		    '(noarch|linux|darwin)(-(x86(_64)?|x64))?'
-		);
-		foreach my $chop (@chops) {
-			next if ($name =~ /($chop)/i);
-			next unless ($ver =~ /($chop)/i);
-			$ver =~ s/[\.\-\_]?($chop)$//gi;
-			debug(__PACKAGE__, $port, "trim $chop -> $ver");
-		}
+		my $chop_regex = qr/addons|all|bin|darwin|build|builtpkgs|dist|
+		    gh|image|languages|linux|noarch|openbsd|orig|plugin|release|
+		    sources?|src|stable|standalone|rpm|unix|utf-8|with|
+		    x86(_64)?|x64?/x;
+		debug(__PACKAGE__, $port, "chop -> $ver")
+		    if ($ver =~ s/([\.\-\_]?($chop_regex))+$//g);
 
 		# Remove all '-' prefix, most common cases
 		if ($ver =~ /^(\D[^-]*-)+(.*)$/) {
