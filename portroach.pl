@@ -995,282 +995,220 @@ sub FindNewestFile
 {
 	my ($port, $site, $files) = @_;
 
-	my ($poss_match, $poss_url, $old_found, $new_found, $golang);
+	my ($poss_match, $poss_url, $old_found, $new_found);
+
+	my $distfile = $port->{distfiles};
+	my $distfile_q = $distfile;
+	my $old_v = $port->{ver};
+	if ($distfile_q =~ s/^(.*)(?:$verprfx_regex?)*\Q$old_v\E(.*)$/$1##V##$2/i) {
+		debug(__PACKAGE__, $port, "optional [-_.] "
+		    . "$distfile -> $distfile_q")
+		    if ($distfile_q =~ s/[\-\_\.]/\.?/g);
+		debug(__PACKAGE__, $port, "optional + "
+		    . "$distfile -> $distfile_q")
+		    if ($distfile_q =~ s/\+/\\\+?/g);
+		$distfile_q =~ s/##V##/(?:$verprfx_regex)?(\\d.*?)/;
+	} else {
+		debug(__PACKAGE__, $port, "invalid distfile $distfile, "
+		    . "version ($verprfx_regex)?$old_v not found.");
+		$distfile_q = undef;
+	}
 
 	foreach my $file (@$files)
 	{
-		my ($poss_path, $github);
+		my ($new_v, $poss_path, $vercheck);
 
 		if ($file =~ /^(.*)\/(.*?)$/) {
 			# Files from SiteHandlers can come with paths
 			# attached; we're only handling absolute paths
-			# here though (XXX: future handlers?)
+			# here though
 			$poss_path = $1;
 			$file = $2;
+			debug(__PACKAGE__, $port, "path detected, split: "
+			    . "path $poss_path, file $file");
 		} else {
 			$poss_path = '';
 		}
 
-		$golang = 1 if ($port->{mastersites} =~ /proxy\.golang\.org/);
-		# XXX s/distfiles/distfile/
-		#foreach my $distfile (split ' ', $port->{distfiles})
-		#{
-			my $distfile = $port->{distfiles};
-			# in Go we explicitly know what the next version is if we have it.
-			next if ($golang);
-			my $v = $port->{ver};
-			my $s = $port->{sufx};
-			my $old_v;
-			$github = 1 if ($site->clone =~ /https:\/\/github.com\//);
+		# Skip beta versions if requested
+		if ($port->{skipbeta} && isbeta($file) && !isbeta($distfile)) {
+			debug(__PACKAGE__, $port, "skip beta $file");
+			next;
+		}
 
-			if ($github) {
-			    $old_v = $distfile;
-			} else {
-			    $old_v = $v;
+		# Weed out some bad matches
+		# XXX the following distfile_q filter should prevent such wrong
+		# filename going through ... maybe drop this
+		my $skip = 0;
+		foreach (@bad_versions) {
+			last if (!$settings{freebsdhacks_enable});
+			next unless ($file =~ /$_/i && $distfile !~ /$_/i);
+			debug(__PACKAGE__, $port, "skip $file, bad $_");
+			$skip = 1;
+			last;
+		}
+		next if ($skip);
+
+		# Version already know from <url>%%<ver> string
+		# XXX <url> not yet implemented
+		if ($file =~ s/^%%//) {
+			$vercheck = 1;
+			debug(__PACKAGE__, $port, "new version ? $file");
+			$new_v = lc $file;
+
+			if ($new_v eq $port->{ver}) {
+				debug(__PACKAGE__, $port, "old found: "
+				    . "new $file, old $port->{ver}");
+				$old_found = 1;
+				next;
 			}
 
-			my $skip = 0;
+		# Version extraction from filename
+		} elsif ($distfile_q && $file =~ /^($distfile_q)$/i && $2) {
+			my $ver = $2;
+			debug(__PACKAGE__, $port, "new file ? $file");
+			$new_v = lc $ver;
 
-			if ($poss_path) {
-				# Do a full-URL comparison for $old_found
-				# if we're dealing with paths too.
-				my ($new_url, $old_url);
-
-				# $site + abs. path
-				$new_url = $site->clone;
-				$new_url->path($poss_path.'/'.$file);
-
-				# $site + filename
-				$old_url = $site->clone;
-				uri_filename($old_url, $distfile);
-
-				if (URI::eq($old_url, $new_url)) {
-					$old_found = 1;
-					next;
-				}
-			} else {
-				if ($file eq $distfile) {
-					$old_found = 1;
-					next;
-				}
-			}
-
-			# Skip beta versions if requested
-
-			if ($port->{skipbeta}) {
-				if (isbeta($file) && !isbeta($distfile)) {
-					next;
-				}
-			}
-
-			# Weed out some bad matches
-
-			if ($settings{freebsdhacks_enable}) {
-				foreach (@bad_versions) {
-					if ($file =~ /$_/i && $distfile !~ /$_/i) {
-					debug(__PACKAGE__, $port,
-					    "skip $file, bad $_");
-							$skip = 1;
-						last;
-					}
-				}
-			}
-
-			next if ($skip);
-
-			# XXX Force number at start - is this reasonable?
-			# XXX: multiple occurences of $v in distfile?
-
-			next unless ($distfile =~ s/^(.*?)\Q$v\E(.*)$/\Q$1\E(\\d.*?)\Q$2\E/);
-
-			# Possible candidate - extract version
-
-			if (($file =~ /^($distfile)$/ && $2) or $github)
-			{
-				my ($version, $new_v);
-
-				unless ($github) {
-					$version = $2;
-					$new_v = lc $version;
-
-					# Catch a few missed cases
-					$new_v =~ s/($ext_regex)$//i;
-
-					# Version is much longer than original - skip it
-					next if (length $new_v > (12 + length $old_v));
-
-					# New version is in date format (or contains a date-like
-					# string) - old one is not. Probably best to ignore.
-
-					next if (
-						$new_v =~ /$date_regex/i &&
-						$old_v !~ /$date_regex/i
-					);
-
-					# Skip a few strange version format change cases
-					# (formatted -> "just a number")
-					next if ($new_v !~ /\./ && $old_v =~ /\./);
-				} else {
-				    # GitHub is "special" as the API gives us a non-${EXTRACT_SUFX}
-				    # as filename (e.g. tarball/v0.25.1). The sitehandler uses the
-				    # last part to stub a distname thru 'project%%$V.tar.gz'.
-				    # The '%%' placeholder is used to make it easier here to extract
-				    # the actual version.
-				    # NB: The link in the webinterface is will still point to the
-				    #     previous tag as the recorded master site contains a
-				    #     hardcoded version. Little we can do at this point.
-				    $version = $1 if $file =~ m/%%(.*)\.tar.gz/;
-
-				    # Turn this into the real filename and set $new_v to the filename.
-				    $file =~ s/%%/-/;
-				    $new_v = $file;
-				}
-
-				print STDERR "version:${version} new_v:${new_v} old_v:${old_v} file:${file}\n" if ($settings{debug});
-
-				# Skip any specific versions if requested
-				if ($port->{skipversions}) {
-					my $skip = 0;
-
-					foreach (split (/\s+/, $port->{skipversions})) {
-						if ($new_v eq $_) {
-							$skip = 1;
-							debug(__PACKAGE__, $port,
-							    "skip $new_v eq $_");
-							last;
-						}
-					}
-
-					next if ($skip);
-				}
-
-				unless ($settings{sillystrings_enable} or $github) {
-					if ($new_v =~ /[-_.]([A-Za-z]+[A-Za-z_-]{2,})$/) {
-						debug(__PACKAGE__, $port,
-						    "sillystrings $new_v");
-						my $str = $1;
-						if (
-							$old_v !~ /[-_.]$str$/
-							&& ($str !~ /^($beta_regex)$/i
-								|| length $1 < length $str) # short RE match
-						) {
-							debug(__PACKAGE__, $port,
-							    "$old_v !~ [-_.]str");
-							debug(__PACKAGE__, $port,
-							    "$str !~ beta_regex") 
-							    if ($str !~ /^($beta_regex)$/i);
-							debug(__PACKAGE__, $port,
-							    "length $1 < length $str") 
-							    if (length $1 < length $str);
-							next;
-						}
-					}
-				}
-
-				# Only allow new major version if port isn't
-				# version-specific
-
-				if ($port->{limitver}) {
-					unless ($new_v =~ /$port->{limitver}/) {
-						debug(__PACKAGE__, $port,
-						    "skip $new_v =~ /$port->{limitver}/");
-						next;
-					}
-				} elsif ($port->{name} =~ /^(.*\D)(\d{1,3})(?:[-_]\D+)?$/) {
-					my $nm_nums = $2;
-					my $vr_nums = $new_v;
-					my $vo_nums = $old_v;
-
-					debug(__PACKAGE__, $port,
-					    "prefix $1 nm_nums $nm_nums");
-
-					unless (($1.$2) =~ /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/i) {
-						my $fullver = '';
-						while ($vo_nums =~ s/^(\d+?)[-_\.]?//) {
-							$fullver .= $1;
-							last if ($fullver eq $nm_nums);
-						}
-
-						debug(__PACKAGE__, $port,
-						    "fullver $fullver nm_nums $nm_nums");
-						if ($fullver eq $nm_nums) {
-							$vr_nums =~ s/[-_\.]//g;
-							unless ($vr_nums =~ /^$nm_nums/) {
-								debug(__PACKAGE__, $port,
-								    "skip $vr_nums =~ /^$nm_nums/");
-								next;
-							}
-						}
-					}
-				}
-
-				if (defined $port->{limiteven} and $port->{limitwhich} >= 0) {
-					unless (checkevenodd($new_v,
-					    $port->{limiteven}, $port->{limitwhich})) {
-						debug(__PACKAGE__, $port,
-						    "skip $new_v: "
-						    . "limiteven $port->{limiteven}, "
-						    . "limitwhich $port->{limitwhich}");
-						next;
-					}
-				}
-
-				# Test our new version string
+			# Version is much longer than original - skip it
+			if (length $new_v > (12 + length $old_v)) {
 				debug(__PACKAGE__, $port,
-				    "check new_v $new_v <> old_v $old_v");
+				    "skip, $new_v > 12 + $old_v");
+				next;
+			}
 
-				if ($new_v eq $old_v)
-				{
-					debug(__PACKAGE__, $port, "old found");
-					$old_found = 1;
-				}
-				elsif (vercompare($new_v, $old_v))
-				{
-					debug(__PACKAGE__, $port, "new found");
-					$new_found = 1;
+			debug(__PACKAGE__, $port,
+			    "file $file =~ $distfile && $ver -> $new_v");
+		} else {
+			debug(__PACKAGE__, $port,
+			    "discard, file $file !~ $distfile ($distfile_q)");
+			next;
+		}
 
-					# Keep going until we find the newest version
-					if (!defined($poss_match) or vercompare($version, $poss_match)) {
-						$poss_match = $version;
+		# Check both version looks the same and are valid
+		unless (isversion($old_v, $new_v)) {
+			debug(__PACKAGE__, $port,
+			    "skip, invalid version $new_v !~ $old_v");
+			next;
+		}
 
-						$poss_url = $site->clone;
+		debug(__PACKAGE__, $port, "new_v ${new_v}, "
+		    . "old_v ${old_v}, file ${file}");
 
-						if ($poss_path) {
-							$poss_url->path($poss_path);
-						}
+		# Skip any specific versions if requested
+		$skip = 0;
+		foreach (split (/\s+/, $port->{skipversions})) {
+			next unless ($new_v eq $_);
+			$skip = 1;
+			debug(__PACKAGE__, $port, "skip $new_v eq $_");
+			last;
+		}
+		next if ($skip);
 
-						$poss_url->path($poss_url->path . '/')
-							if ($poss_url !~ /\/$/);
-
-						uri_filename($poss_url, $file);
-
-						debug(__PACKAGE__, $port, "last found "
-						    . "poss $poss_match '$poss_url'");
-						next;
-					}
-				} else {
-					debug(__PACKAGE__, $port, "skip $new_v < $old_v");
+		unless ($settings{sillystrings_enable}) {
+			if ($new_v =~ /[-_.]([A-Za-z]+[A-Za-z_-]{2,})$/) {
+				my $str = $1;
+				debug(__PACKAGE__,$port,"sillystrings $new_v");
+				if ($old_v !~ /[-_.]$str$/ && (
+				    $str !~ /^($beta_regex)$/i ||
+				    length $1 < length $str) # short RE match
+				) {
+					debug(__PACKAGE__, $port,
+					    "$old_v !~ [-_.]str");
+					debug(__PACKAGE__, $port,
+					    "$str !~ beta_regex")
+					    if ($str !~ /^($beta_regex)$/i);
+					debug(__PACKAGE__, $port,
+					    "length $1 < length $str")
+					    if (length $1 < length $str);
+					next;
 				}
 			}
-		#} XXX s/distfiles/distfile/
-	}
+		}
 
-	# Compare version to previously found new version,
-	# if any. Don't bother reporting an older version.
-	if ($port->{newver} && !vercompare($poss_match, $port->{newver})) {
-		$new_found  = undef;
-		$poss_match = undef;
-		$poss_url   = undef;
-	}
+		# Only allow new major version if port isn't version-specific
+		if ($port->{limitver}) {
+			unless ($new_v =~ /$port->{limitver}/) {
+				debug(__PACKAGE__, $port,
+				   "skip $new_v =~ /$port->{limitver}/");
+				next;
+			}
+		} elsif ($port->{name} =~ /^(.*\D)(\d{1,3})(?:[-_]\D+)?$/) {
+			my $nm_nums = $2;
+			my $vr_nums = $new_v;
+			my $vo_nums = $old_v;
 
-	# In Go we set newver explicitly, so check it here.
-	if ($golang) {
-		if (defined $port->{newver} && defined $port->{ver} && vercompare($port->{newver}, $port->{ver})) {
-			$new_found = $port->{newver};
-			$old_found = $port->{ver};
-			$poss_match = $port->{newver};
-		} elsif (defined $port->{ver}) {
-			$old_found = $port->{ver};
+			debug(__PACKAGE__, $port, "prefix $1 nm_nums $nm_nums");
+
+			unless (($1.$2) =~
+			    /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/i) {
+
+				my $fullver = '';
+				while ($vo_nums =~ s/^(\d+?)[-_\.]?//) {
+					$fullver .= $1;
+					last if ($fullver eq $nm_nums);
+				}
+
+				
+				if ($fullver eq $nm_nums) {
+					debug(__PACKAGE__, $port,
+					   "fullver $fullver nm_nums $nm_nums");
+					$vr_nums =~ s/[-_\.]//g;
+					unless ($vr_nums =~ /^$nm_nums/) {
+						debug(__PACKAGE__, $port,
+						    "skip $vr_nums ~ $nm_nums");
+						next;
+					}
+				}
+			}
+		}
+
+		if (defined $port->{limiteven} and $port->{limitwhich} >= 0) {
+			unless (checkevenodd($new_v,
+			    $port->{limiteven}, $port->{limitwhich})) {
+				debug(__PACKAGE__, $port,
+				    "skip $new_v: "
+				    . "limiteven $port->{limiteven}, "
+				    . "limitwhich $port->{limitwhich}");
+				next;
+			}
+		}
+
+		# Test our new version string
+		debug(__PACKAGE__, $port, "check new_v $new_v <> old_v $old_v");
+
+		if ($new_v eq $old_v) {
+			debug(__PACKAGE__, $port, "old found");
+			$old_found = 1;
+
+		} elsif (vercompare($new_v, $old_v)) {
+			debug(__PACKAGE__, $port, "new found");
+			$new_found = 1;
+
+			# Keep going until we find the newest version
+			if (!defined($poss_match) or
+			    vercompare($new_v, $poss_match)) {
+				$poss_match = $new_v;
+				if ($poss_path =~ /^https?:\/\/[^\/]+\//) {
+					$poss_url = URI->new($poss_path);
+				} else {
+					$poss_url = $site->clone;
+					$poss_url->path($poss_path)
+					    if ($poss_path);
+					$poss_url->path($poss_url->path . '/')
+					    if ($poss_url !~ /\/$/);
+				}
+				if ($vercheck) {
+					# XXX stupid but works
+					$poss_url = "";
+				} else {
+					uri_filename($poss_url, $file);
+				}
+				debug(__PACKAGE__, $port, "last found "
+				    . "poss $poss_match '$poss_url'");
+				next;
+			}
+		} else {
+			debug(__PACKAGE__, $port, "skip $new_v < $old_v");
 		}
 	}
 
