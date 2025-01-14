@@ -93,15 +93,24 @@ my %want_regex = (
 	maintainer => restrict2regex($settings{restrict_maintainer})
 );
 
+# XXX vercompare handle long months but not date_regex
 @months = (
-	qr/Jan(?:uary)?/, qr/Feb(?:ruary)?/, qr/Mar(?:ch)?/, qr/Apr(?:il)?/,
-	qr/May/, qr/Jun(?:e)?/, qr/Jul(?:y)?/, qr/Aug(?:ust)?/, qr/Sep(?:tember)?/,
-	qr/Oct(?:ober)?/, qr/Nov(?:ember)?/, qr/Dec(?:ember)?/
+	qr/Jan(?:uary)?/,
+	qr/Feb(?:ruary)?/,
+	qr/Mar(?:ch)?/,
+	qr/Apr(?:il)?/,
+	qr/May/,
+	qr/Jun(?:e)?/,
+	qr/Jul(?:y)?/,
+	qr/Aug(?:ust)?/,
+	qr/Sep(?:tember)?/,
+	qr/Oct(?:ober)?/,
+	qr/Nov(?:ember)?/,
+	qr/Dec(?:ember)?/
 );
 
-$month_regex = 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
-$date_regex  = '(?<!\d)\d{2,4}([\-\.]?)(?:\d{2}|'.$month_regex.')\1'
-    . '\d{2,4}(?!\d)';
+$month_regex = qr/jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/;
+$date_regex  = qr/(?<!\d)\d{2,4}([\-\.]?)(?:\d{2}|$month_regex)\1\d{2,4}(?!\d)/;
 
 %beta_types = (
 	snapshot   => { re => 'svn|cvs|snap(?:shot)?|nightly',	rank => 1 },
@@ -371,7 +380,7 @@ sub vercompare
 	unless ($new =~ /^$date_regex$/i && $old =~ /^$date_regex$/i)
 	{
 		my $date_regex = $date_regex;
-		$date_regex =~ s/\\1/\\3/g;		# Bump internal backreference (evil)
+		$date_regex =~ s/\\1/\\3/g; # Bump internal backreference (evil)
 
 		if ($new =~ /^(.*?)[\-\.]?($date_regex)[\-\.]?(.*)$/i) {
 			my ($new_1, $new_2, $new_3) = ($1, $2, $4);
