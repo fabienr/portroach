@@ -457,7 +457,7 @@ sub VersionCheck
 	# Override MASTER_SITES if requested
 	$port->{mastersites} = $port->{indexsite} if ($port->{indexsite});
 
-# XXX s/distfiles/distfile/
+	# XXX s/distfiles/distfile/
 	return if (!$port->{distfiles} || !$port->{mastersites});
 
 	info(1, $k, 'VersionCheck()');
@@ -499,7 +499,7 @@ sub VersionCheck
 		# Look to see if the URL contains the distfile version.
 		# This will affect our checks and guesses later on.
 		if ($port->{ver} =~ /^(?:\d+\.)+\d+$/
-				or $port->{ver} =~ /$date_regex/i) {
+				or $port->{ver} =~ /$date_regex/) {
 			my ($lastdir, $majver);
 
 			$lastdir = uri_lastdir($site);
@@ -595,7 +595,7 @@ sub VersionCheck
 				last;
 			}
 			if ($ftp_failures) {
-				info(1, $k, $host, 'FTP error: too many failure($ftp_failures)');
+				info(1, $k, $host, "FTP error: too many failure($ftp_failures)");
 				next;
 			}
 
@@ -720,7 +720,7 @@ sub VersionCheck
 							    "push $path$dir/$_")
 							    foreach (@files_tmp);
 							push @files, "$path$dir/$_"
-								foreach (@files_tmp);
+							    foreach (@files_tmp);
 						}
 					}
 				}
@@ -809,7 +809,7 @@ sub VersionCheck
 
 					info(1, $k, $host, "Guessing version $port->{ver} -> $guess_v");
 
-# XXX s/distfiles/distfile/
+					# XXX s/distfiles/distfile/
 					#foreach my $distfile (split ' ', $port->{distfiles})
 					#{
 						my $distfile = $port->{distfiles};
@@ -836,7 +836,7 @@ sub VersionCheck
 						%headers  = %{$resp->headers};
 
 						if ($resp->is_success && $resp->status_line =~ /^2/ &&
-								$headers{'content-type'} !~ /($bad_mimetypes)/i) {
+						    $headers{'content-type'} !~ /($bad_mimetypes)/i) {
 							info(0, $k, $host, "UPDATE $port->{ver} -> $guess_v");
 
 							$sths->{portdata_setnewver}->execute(
@@ -861,14 +861,14 @@ sub VersionCheck
 			last if ($new_found);
 		}
 
-		debug(__PACKAGE__, $port, "Files for "
-		    . "$port->{fullpkgpath} from $site:");
+		debug(__PACKAGE__, $port, "Files from $site:");
 		debug(__PACKAGE__, $port, " -> $_") foreach @files;
 
 		# Make note of working site
 		$sths->{sitedata_success}->execute($site->host);
 
 		if ($method == METHOD_HANDLER && !@files) {
+			# XXX github return no file if old found in last release
 			$sths->{portdata_setmethod}->execute(
 				$method,
 				$port->{id}
@@ -913,7 +913,7 @@ sub VersionCheck
 			    !$settings{regress});
 
 		} elsif ($new_found) {
-			info(1, $k, $host, "STILL new, method $method");
+			info(1, $k, $host, "STILL new, $file->{version}");
 
 		} elsif ($old_found && $port->{method} &&
 		    $method != $port->{method}) {
@@ -926,10 +926,10 @@ sub VersionCheck
 			    !$settings{regress});
 
 		} elsif ($old_found && $port->{method}) {
-			info(1, $k, $host, "STILL old, method $method");
+			info(1, $k, $host, "STILL old, $port->{ver}");
 
 		} elsif ($old_found) {
-			info(0, $k, $host, "FOUND old, method -> $method");
+			info(0, $k, $host, "FOUND old, $port->{ver}");
 			$sths->{portdata_setmethod}->execute(
 				$method,
 				$port->{id}
@@ -1983,7 +1983,8 @@ sub ShowUpdates
 			$maintainer = $port->{maintainer};
 			info(0, "${maintainer}'s ports.");
 		}
-		info(1, "$port->{fullpkgpath} $port->{ver} -> $port->{newver}");
+		info(1, "$port->{fullpkgpath}: "
+		    . "$port->{ver} -> $port->{newver}");
 	}
 
 	finish_sql($dbh, \%sths);
@@ -2065,10 +2066,10 @@ sub RemoveMailAddrs
 			$sths{maildata_delete}->execute($addr);
 
 			$rows = $sths{maildata_delete}->rows;
-			print $rows ? 'OK.' : 'not in database.';
+			print $rows ? 'OK.\n' : 'not in database.\n';
+		} else {
+			print 'not allowed (precious_data).\n';
 		}
-
-		print "\n";
 	}
 
 	$sths{maildata_delete}->finish;
