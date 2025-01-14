@@ -94,7 +94,7 @@ sub GetFiles
 	$registry = 'https://proxy.golang.org/';
 
 	if ($port->{distname} =~ /^(.*)-(v)?\d+\.\d+.\d+(.*)?$/) {
-	    $dist = $1;
+		$dist = $1;
 	}
 
 	$query = $url;
@@ -105,24 +105,25 @@ sub GetFiles
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
-	    my ($json, $version);
+		my ($json, $ver);
 
-	    $json = decode_json($resp->decoded_content);
-	    $version = $json->{Version};
-	    unless ($version) {
-	        print STDERR "$port->{fullpkgpath}: $query, "
-		    . "invalid json, no Version\n";
-	        return 0;
-	    }
+		$json = decode_json($resp->decoded_content);
+		$ver = $json->{Version};
+		unless ($ver) {
+			print STDERR "$port->{fullpkgpath}: $query, "
+			    . "invalid json, no Version\n";
+			return 0;
+		}
 
-	    $port->{newver} = $version;
-	    $version =~ s/v//;
+		$ver = lc $ver;
+		debug(__PACKAGE__, $port, "trim (v...|r...) -> $ver")
+		    if ($ver =~ s/^$verprfx_regex//);
 
-	    push(@$files, "$dist-${version}.zip");
+		push(@$files, "%%$ver");
 	} else {
-	    info(1, $port->{fullpkgpath}, strchop($query, 60)
-	        . ': ' . $resp->status_line);
-	    return 0;
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+		    . ': ' . $resp->status_line);
+		return 0;
 	}
 
 	return 1;
