@@ -468,6 +468,8 @@ sub VersionCheck
 		my (@files, @dates, $host, $sitedata, $method, $path_ver,
 		    $new_found, $old_found, $file);
 
+		$site .= '/' unless $site =~ /\/$/;
+
 		$host = URI->new($site)->host;
 		$sths->{sitedata_select}->execute($host);
 		while (my $data = $sths->{sitedata_select}->fetchrow_hashref) {
@@ -538,9 +540,9 @@ sub VersionCheck
 			# Try harder, append distfile
 			# XXX s/distfiles/distfile/
 			if (!$method && !$sh->GetFiles(
-			    $site.'/'.$port->{distfiles}, $port, \@files)) {
+			    $site.$port->{distfiles}, $port, \@files)) {
 				info(1, $k, $host, 'SiteHandler::GetFiles() '
-				    . "failed for $site/$port->{distfiles}");
+				    . "failed for $site$port->{distfiles}");
 				next;
 			} else {
 				$method = METHOD_HANDLER;
