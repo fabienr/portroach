@@ -647,7 +647,7 @@ sub extractdirectories
 sub extractsuffix
 {
 	my $sufx = shift;
-	return unless ($sufx =~ s/^(.*?)($ext_regex)$/$2/i);
+	return unless ($sufx =~ s/^(.*?)(($ext_regex)+)$/$2/i);
 	return $sufx;
 }
 
