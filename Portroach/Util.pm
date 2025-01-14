@@ -30,6 +30,7 @@ package Portroach::Util;
 use Portroach::Const;
 use Portroach::Config;
 use File::Path qw(make_path);
+use URI::Escape;
 
 require Exporter;
 
@@ -608,7 +609,9 @@ sub extractfilenames
 
 	foreach (split "\n", $data) {
 		while (/<a href=(['"])([^<>]*?$sufx)\1.*?<\/a>/gi) {
-			push @$files, $2;
+			my $file = uri_unescape($2);
+			debug(__PACKAGE__, undef, "") if ($file ne $2);
+			push @$files, $file;
 		}
 
 		$got_index = /<title>\s*index of.*?<\/title>/i if (!$got_index);
