@@ -18,10 +18,9 @@
 package Portroach::SiteHandler::GitHub;
 
 use JSON qw(decode_json);
-use LWP::UserAgent;
 use URI;
 
-use Portroach::Const;
+use Portroach::Util;
 use Portroach::Config;
 
 use strict;
@@ -74,7 +73,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /https:\/\/github\.com\//);
+	return ($url =~ /https?:\/\/github\.com\//);
 }
 
 
@@ -96,137 +95,129 @@ sub GetFiles
 	my $self = shift;
 
 	my ($url, $port, $files) = @_;
-	my $projname;
+	my (@tags, $projname, $query, $ua, $req, $resp, $json, $ver);
 
-	# Determine at the extension used for the current distfile.
-	my $cur_suffix = $port->{distfiles};
-
-	if ($url =~ /https:\/\/github\.com\/(.*?)\/archive\//) {
+	if ($url =~ /https?:\/\/github\.com\/(.*?)\/(archive|raw|releases)\//) {
 		$projname = $1;
-	} elsif ($url =~ /https:\/\/github.com\/downloads\/(.*)\//) {
-		$projname = $1;
-	} elsif ($url =~ /https:\/\/github.com\/(.*?)\/releases\//) {
+	} elsif ($url =~ /https?:\/\/github.com\/downloads\/(.*)\//) {
 		$projname = $1;
 	}
 
-	if ($projname) {
-		my ($query, $ua, $response, $items, $json);
+	# XXX check if $projname =~ /.*?\/(.*)/ ?
 
-		# First check if there's a latest releases endpoint
-		$query = 'https://api.github.com/repos/' . $projname . '/releases/latest';
-
-		_debug("GET $query");
-		$ua = LWP::UserAgent->new;
-		$ua->agent(USER_AGENT);
-		$ua->timeout($settings{http_timeout});
-
-		my $request;
-
-		if ($settings{github_token}) {
-			#$req->authorization_basic('token', $settings{github_token});
-			my $auth_header = HTTP::Headers->new ('Authorization' => "Token $settings{github_token}");
-			$request = HTTP::Request->new(GET => $query, $auth_header);
-		} else {
-			$request = HTTP::Request->new(GET => $query);
-		}
-
-		$response = $ua->request($request);
-
-		if ($response->is_success) {
-			$json = decode_json($response->decoded_content);
-
-			# Obtain the assets associated with the latest release, in particular
-			# see if there's one that matches the extension of the current distfile.
-			foreach my $assets ($json->{assets}[0]) {
-				foreach my $asset ($assets) {
-					# Make sure to exclude stuff like "release-1.2.3". When we
-					# encounter an asset like that, just bail out as anything
-					# else will be just the same and we won't find a newer
-					# release anyway.
-					return 1 if ($asset->{name} =~ m/.*$port->{ver}/);
-
-					# There's some weird shit out there, like "release-67-1".
-					# Normalize both the original distname and the new asset
-					# make a proper comparison free of '_' or '-'.
-					my @distname_norm = split(/[-_]+/, $port->{distname});
-					my @asset_norm = split(/[-_]+/, $asset->{name});
-					return 1 if (@distname_norm == @asset_norm);
-
-					if ($asset->{name} =~ m/${cur_suffix}$/) {
-						push(@$files, $asset->{browser_download_url});
-					}
-				}
-			}
-
-			# If no new release was found based on the current extension, try harder.
-			if (!@$files) {
-				my $filename = (URI->new($json->{tarball_url})->path_segments)[-1];
-				_debug("  -> " . $filename);
-				$filename =~ s/^v//;
-				$projname =~ m/.*?\/(.*)/;
-
-				# In some cases the project name (read: repository) is part of the tagname.
-				# For example: 'heimdal-7.3.0' is the full tagname. Therefore remove the
-				# repository name from the filename just in case.
-				my ($account, $repo) = split('/', $projname);
-				$filename =~ s/^${repo}-//;
-
-				# Use '%%' as a placeholder for easier splitting in FindNewestFile().
-				_debug("pushing: " . $repo . "%%" . $filename . ".tar.gz with projname:${projname} account:${account} repo:${repo} filename:${filename}");
-				push(@$files, $repo . "%%" . $filename . ".tar.gz");
-			}
-		} else {
-			if ($response->header('x-ratelimit-remaining') == 0) {
-				print STDERR ("Error: API rate limit exceeded, please set 'github token' in portroach.conf\n");
-				return 0;
-			}
-			_debug('GET failed for /latest: ' . $response->status_line);
-			# Project didn't do any releases, so let's try tags instead.
-			$query = 'https://api.github.com/repos/' . $projname . '/tags';
-			_debug("GET $query");
-			$ua = LWP::UserAgent->new;
-			$ua->agent(USER_AGENT);
-			$ua->timeout($settings{http_timeout});
-
-			$response = $ua->request(HTTP::Request->new(GET => $query));
-
-			if (!$response->is_success || $response->status_line !~ /^2/) {
-				_debug('GET failed: ' . $response->status_line);
-				return 0;
-			}
-
-			$json = decode_json($response->decoded_content);
-			foreach my $tag (@$json) {
-				my $tag_url = $tag->{tarball_url};
-				_debug("  -> $tag_url");
-				push(@$files, $tag_url);
-			}
-		}
-		_debug('Found ' . scalar @$files . ' files');
-	} else {
+	unless ($projname) {
+		print STDERR "$port->{fullpkgpath}: $url, "
+		    . "no projname found in url\n";
 		return 0;
 	}
 
+	# First check if there's a latest releases endpoint
+	$query = 'https://api.github.com/repos/'.$projname.'/releases/latest';
+	debug(__PACKAGE__, $port, "GET $query");
+	$ua = lwp_useragent();
+
+	if ($settings{github_token}) {
+		my $auth_header = HTTP::Headers->new (
+		    'Authorization' => "Token $settings{github_token}");
+		$req = HTTP::Request->new(GET => $query, $auth_header);
+	} else {
+		$req = HTTP::Request->new(GET => $query);
+	}
+
+	$resp = $ua->request($req);
+
+	if ($resp->is_success) {
+		$json = decode_json($resp->decoded_content);
+
+		# Obtain the assets associated with the latest release
+		# XXX maybe drop this: what matter is version detection thus
+		#     we don't care if the new url isn't pointing to an asset
+		foreach my $asset (@{$json->{assets}}) {
+			if ($asset->{name} !~ m/$port->{sufx}$/) {
+				debug(__PACKAGE__, $port,
+				    "$asset->{name} !~ $port->{sufx}");
+				next;
+			}
+			push(@$files, $asset->{browser_download_url});
+		}
+
+		# Anyway push the tag_name as version
+		# XXX tmp fix, in case tags got messy and older pop first
+		push(@tags, $json->{tag_name});
+
+	} else {
+		if ($resp->header('x-ratelimit-remaining') == 0) {
+			print STDERR "$port->{fullpkgpath}: "
+			    . "API rate limit exceeded, "
+			    . "please set 'github token' in portroach.conf\n";
+			return 0;
+		}
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+		    . ': ' . $resp->status_line);
+	}
+
+	# Project may not do releases (any more), so let's load tags anyway.
+	# XXX tags are sorted based on git output (alphabetical)
+	# XXX API /tags returns only top X tags, use '?page=Y' ?
+	# XXX GraphQL can be used for more complex querries
+	$query = 'https://api.github.com/repos/' . $projname . '/tags';
+	debug(__PACKAGE__, $port, "GET $query");
+
+	if ($settings{github_token}) {
+		my $auth_header = HTTP::Headers->new (
+		    'Authorization' => "Token $settings{github_token}");
+		$req = HTTP::Request->new(GET => $query, $auth_header);
+	} else {
+		$req = HTTP::Request->new(GET => $query);
+	}
+
+	$resp = $ua->request($req);
+
+	if (!$resp->is_success || $resp->status_line !~ /^2/) {
+		if ($resp->header('x-ratelimit-remaining') == 0) {
+			print STDERR "$port->{fullpkgpath}: "
+			    . "API rate limit exceeded, "
+			    . "please set 'github token' in portroach.conf\n";
+			return 0;
+		}
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+		    . ': ' . $resp->status_line);
+		return 0;
+	}
+
+	$json = decode_json($resp->decoded_content);
+	foreach my $tag (@$json) {
+		push(@tags, $tag->{name});
+	}
+
+	# In some cases the project name (read: repo) is part of the tagname.
+	# For example: 'heimdal-7.3.0' is the full tagname. Therefore remove the
+	# repository name from the filename just in case.
+	my ($account, $repo) = split('/', $projname);
+
+	foreach my $tag (@tags) {
+		my $ver = lc $tag;
+
+		debug(__PACKAGE__, $port, "repo -> $ver")
+		    if ($ver =~ s/^${repo}-//);
+		debug(__PACKAGE__, $port, "(v|r) prefix -> $ver")
+		    if ($ver =~ s/^$verprfx_regex//);
+		debug(__PACKAGE__, $port, "\\D[-._] -> $ver")
+		    if ($ver =~ s/^\D*[-\._]//);
+
+		debug(__PACKAGE__, $port, "tag $tag -> $ver")
+		    if ($tag ne $ver);
+		debug(__PACKAGE__, $port, "stop loading tag, old found $ver")
+		    if ($ver eq $port->{ver});
+
+		$ver = '%%' . $ver;
+		push(@$files, $ver);
+
+		# XXX tmp fix, need graphql to order tag correclty
+		last if ($ver eq '%%'.$port->{ver});
+	}
+
 	return 1;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: _debug()
-# Desc: Print a debug message.
-#
-# Args: $msg - Message.
-#
-# Retn: n/a
-#------------------------------------------------------------------------------
-
-sub _debug
-{
-	my ($msg) = @_;
-
-	$msg = '' if (!$msg);
-
-	print STDERR "(" . __PACKAGE__ . ") $msg\n" if ($settings{debug});
 }
 
 1;
