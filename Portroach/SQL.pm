@@ -80,17 +80,22 @@ $sql{portdata_update} =
 # Port.pm:BuildPort()
 
 # order by make sure shorter (main) fullpkgpath come first
-$sql{create_view} =
-   q(CREATE TEMP VIEW RoachData AS
-    SELECT fullpkgpath, categories,
-	case when distname not null then distname else fullpkgname end
-	as distname,
-	     roach_url as distfiles,
-             roach_sites as master_sites, 
-	     maintainer, comment, portroach,
-	     portroach_comment, homepage,
-	     pkgname
-        FROM portsq ORDER BY fullpkgpath);
+$sql{create_view} = q(CREATE TEMP VIEW RoachData AS
+	SELECT
+	    FullPkgPath as fullpkgpath,
+	    CATEGORIES as categories,
+	    case when DISTNAME not null then DISTNAME else FullPkgPath end
+	        as distname,
+	    ROACH_URL as distfiles,
+	    ROACH_SITES as master_sites,
+	    MAINTAINER as maintainer,
+	    COMMENT as comment,
+	    PORTROACH as portroach,
+	    PORTROACH_COMMENT as portroach_comment,
+	    HOMEPAGE as homepage,
+	    PKGNAME as pkgname
+	FROM portsq
+	ORDER BY fullpkgpath);
 
 $sql{ports_select} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
