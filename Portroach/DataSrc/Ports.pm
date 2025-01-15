@@ -33,6 +33,7 @@ use base qw(Portroach::DataSrc);
 use File::stat;
 
 use URI;
+use URI::Escape;
 
 use Try::Tiny;
 
