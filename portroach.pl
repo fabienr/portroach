@@ -683,53 +683,62 @@ sub VersionCheck
 
 			if ($resp->is_success) {
 				extractfilenames($resp->content, $port->{sufx},
-					\@files, \@dates);
-
-				if (@files && $path_ver) {
-					# Directory listing a success: we can
-					# investigate $path_ver variations...
-					my $site = $site->clone;
-					my (@dirs, $path);
-
-					# Visit parent directory
-
-					uri_lastdir($site, undef);
-					$path = $site->path;
-
-					$resp = $ua->get($site);
-
-					extractdirectories($resp->content, \@dirs)
-						if ($resp->is_success);
-
-					# Investigate sibling version dirs
-
-					foreach my $dir (@dirs) {
-						if ($dir =~ /^(?:\d+\.)+\d+$/
-								or $dir =~ /$date_regex/i) {
-							my @files_tmp;
-
-							$site->path("$path$dir");
-							$resp = $ua->get($site);
-
-							extractfilenames(
-								$resp->content,
-								$port->{sufx},
-								\@files_tmp,
-								\@dates
-							) if ($resp->is_success);
-
-							debug(__PACKAGE__, $port,
-							    "push $path$dir/$_")
-							    foreach (@files_tmp);
-							push @files, "$path$dir/$_"
-							    foreach (@files_tmp);
-						}
-					}
-				}
+				    \@files, \@dates);
+				info(1, $port->{fullpkgpath}, $host,
+				    "no link mathing $port->{sufx}")
+				    if (!@files);
 			} else {
 				info(1, $port->{fullpkgpath}, strchop($site, 60)
 				    . ': ' . $resp->status_line);
 			}
+
+			if (@files && $path_ver) {
+				# Directory listing a success: we can
+				# investigate $path_ver variations...
+				my $site = $site->clone;
+				my (@dirs, $path);
+
+				# Visit parent directory
+
+				uri_lastdir($site, undef);
+				$path = $site->path;
+
+				$resp = $ua->get($site);
+
+				extractdirectories($resp->content, \@dirs)
+				    if ($resp->is_success);
+				info(1, $port->{fullpkgpath}, strchop($site, 60)
+				    . ': ' . $resp->status_line)
+				    unless ($resp->is_success);
+
+				# Investigate sibling version dirs
+				foreach my $dir (@dirs) {
+					if ($dir =~ /^(?:\d+\.)+\d+$/
+					    or $dir =~ /$date_regex/i) {
+						my @files_tmp;
+
+						$site->path("$path$dir");
+						$resp = $ua->get($site);
+
+						extractfilenames(
+						    $resp->content,
+						    $port->{sufx},
+						    \@files_tmp,
+						    \@dates
+						) if ($resp->is_success);
+						info(1, $port->{fullpkgpath},
+						    strchop($site, 60)
+						    . ': ' . $resp->status_line)
+						    unless ($resp->is_success);
+
+						debug(__PACKAGE__, $port,
+						    "push $path$dir/$_")
+						    foreach (@files_tmp);
+						push @files, "$path$dir/$_"
+						    foreach (@files_tmp);
+					}
+				}
+			} 
 
 			# No files found - try some guesses
 			if (!@files && !$port->{indexsite})
