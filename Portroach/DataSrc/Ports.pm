@@ -248,6 +248,14 @@ sub BuildPort
 	$distfile = $ports[3];
 	$distfile =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
 
+	# ports should not use encoded url
+	if ((my $file = uri_unescape($distfile)) ne $distfile) {
+		print STDERR "$fullpkgpath: FIX encoded url, "
+		    . "$distfile -> $file\n";
+		$distfile = $file;
+	}
+
+	# detect url file?k=v;... and remove anything after '?'
 	if ($distfile =~ /\?/) {
 		$url = $distfile;
 		$distfile =~ s/\?.*$//;
