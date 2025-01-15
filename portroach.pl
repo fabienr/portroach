@@ -811,50 +811,44 @@ sub VersionCheck
 
 					info(1, $k, $host, "Guessing version $port->{ver} -> $guess_v");
 
-					# XXX s/distfiles/distfile/
-					#foreach my $distfile (split ' ', $port->{distfiles})
-					#{
-						my $distfile = $port->{distfiles};
-						my $site = $site->clone;
+					my $distfile = $port->{distfiles};
+					my $site = $site->clone;
 
-						next unless ($distfile =~ s/$old_v/$guess_v/gi);
+					next unless ($distfile =~ s/$old_v/$guess_v/gi);
 
-						if ($path_ver) {
-							my ($path);
-							uri_lastdir($site, undef);
-							$path = $site->path;
-							if ($path_ver ne $port->{ver}) {
-								# Major ver in site path
-								my $guess_maj = $guess_v;
-								$guess_maj =~ s/\.\d+$//;
-								$site->path("$path$guess_maj/");
-							} else {
-								# Full ver in site path
-								$site->path("$path$guess_v/");
-							}
-						}
-
-						$resp = $ua->head($url.$distfile);
-						%headers  = %{$resp->headers};
-
-						if ($resp->is_success && $resp->status_line =~ /^2/ &&
-						    $headers{'content-type'} !~ /($bad_mimetypes)/i) {
-							info(0, $k, $host, "UPDATE $port->{ver} -> $guess_v");
-
-							$sths->{portdata_setnewver}->execute(
-								$guess_v, METHOD_GUESS, $url.$distfile,
-								$port->{id}
-							) unless ($settings{precious_data});
-
-							$new_found = 1;
-							$found = 2 if ($new_found);
-							last;
+					if ($path_ver) {
+						my ($path);
+						uri_lastdir($site, undef);
+						$path = $site->path;
+						if ($path_ver ne $port->{ver}) {
+							# Major ver in site path
+							my $guess_maj = $guess_v;
+							$guess_maj =~ s/\.\d+$//;
+							$site->path("$path$guess_maj/");
 						} else {
-							info(1, $k, $host, "Guess failed $port->{ver} -> $guess_v");
+							# Full ver in site path
+							$site->path("$path$guess_v/");
 						}
+					}
 
-						last if ($new_found);
-					#} XXX s/distfiles/distfile/
+					$resp = $ua->head($url.$distfile);
+					%headers  = %{$resp->headers};
+
+					if ($resp->is_success && $resp->status_line =~ /^2/ &&
+						$headers{'content-type'} !~ /($bad_mimetypes)/i) {
+						info(0, $k, $host, "UPDATE $port->{ver} -> $guess_v");
+
+						$sths->{portdata_setnewver}->execute(
+							$guess_v, METHOD_GUESS, $url.$distfile,
+							$port->{id}
+						) unless ($settings{precious_data});
+
+						$new_found = 1;
+						$found = 2 if ($new_found);
+						last;
+					} else {
+						info(1, $k, $host, "Guess failed $port->{ver} -> $guess_v");
+					}
 
 					last if ($new_found);
 				}
