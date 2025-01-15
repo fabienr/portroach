@@ -127,8 +127,8 @@ $beta_regex = join '|', map +($beta_types{$_}->{re}), keys %beta_types;
 
 $ext_regex = qr/
     \.((l|t?b|t?g|t?x)?z(2|st)?)|(\.langpack)?\.xpi|\.pl(\.uu|\.txt)?|
-    \.bin|\.c|\.dictd|\.dtd|\.exe|\.F90|\.gem|\.ins|\.jar|\.kar|\.mp3|\.otf|
-    \.pdf|\.phar|\.rar|\.rpm|\.run|\.sfc|\.shar|\.spl|\.tar|\.tgz|\.ttf|
+    \.bin|\.c|\.dictd|\.dtd|\.exe|\.F90|\.gem|\.html|\.ins|\.jar|\.kar|\.mp3|
+    \.otf|\.pdf|\.phar|\.rar|\.rpm|\.run|\.sfc|\.shar|\.spl|\.tar|\.tgz|\.ttf|
     \.txi|\.txt|\.uqm|\.war|\.zip/xi;
 
 $verprfx_regex = qr/(?:v|ver|r|rel|release)[-\._]?(?=\d)/;
