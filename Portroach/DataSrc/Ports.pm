@@ -257,9 +257,12 @@ sub BuildPort
 
 	$maintainer = $ports[5];
 	$comment    = $ports[6];
-	foreach (split /\s+/, $ports[7]) {
-		if (/^([A-Za-z]+):(.*)$/i) {
+
+	foreach my $cfg (split /\s+/, $ports[7]) {
+		if ($cfg =~ /^([A-Za-z]+):(.*)$/i) {
 			$pcfg{lc $1} = $2;
+		} else {
+			print STDERR "$fullpkgpath: invalid portroach '$cfg'\n";
 		}
 	}
 	$pcfg_comment = $ports[8];
