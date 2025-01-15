@@ -902,8 +902,8 @@ sub VersionCheck
 		    $file->{url} ne $port->{newurl} ||
 		    $method != $port->{method})) {
 			regress($k, $host,
-			    "url '$port->{newurl}' -> '$file->{url}'")
-			    if ($file->{url} != $port->{newurl});
+			    "url $port->{newurl} -> $file->{url}")
+			    if ($file->{url} ne $port->{newurl});
 			regress($k, $host,
 			    "method $port->{method} -> $method")
 			    if ($method != $port->{method});
