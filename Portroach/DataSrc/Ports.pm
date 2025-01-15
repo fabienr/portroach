@@ -195,9 +195,9 @@ sub BuildPort
 
     while(@ports = $q->fetchrow_array()) {
 	my (%pcfg, @sites, $fullpkgpath, $pkgname, $name,
-	    $category, $distname, $distfile, $url, $maintainer, $comment, $sufx,
-	    $ver, $versrc, $basepkgpath, $pcfg_comment, $homepage, $port,
-	    $basename, $pathname, $basename_q, $pathname_q);
+	    $category, $distname, $distfile, $path, $url, $maintainer,
+	    $comment, $sufx, $ver, $versrc, $basepkgpath, $pcfg_comment,
+	    $homepage, $port, $basename, $pathname, $basename_q, $pathname_q);
 	$n_port++;
 
 	$pkgname     = $ports[10];
@@ -249,6 +249,14 @@ sub BuildPort
 	$distfile = $ports[3];
 	$distfile =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
 
+	# detect path in distfile, move it into SITES
+	if ($distfile =~ /^(.*)\/(.*?)$/) {
+		debug(__PACKAGE__, $port, "path detected, "
+		    . "split $distfile -> $1 / $2");
+		$path = $1 . '/';
+		$distfile = $2;
+	}
+
 	# ports should not use encoded url
 	if ((my $file = uri_unescape($distfile)) ne $distfile) {
 		print STDERR "$fullpkgpath: FIX encoded url, "
@@ -289,15 +297,41 @@ sub BuildPort
 			next;
 		}
 		try {
-			$site = URI->new($site)->canonical;
-			next if (length $site->host == 0);
+			# path detected in distfile, move it into SITES
+			unless ($site =~ /\/$/) {
+				print STDERR "$fullpkgpath: FIX site, "
+				    . "missing last '/' in $site\n";
+				$site .= '/';
+			}
+			$site .= $path if ($path);
 
-			my $mastersite_regex = Portroach::Util::restrict2regex($settings{mastersite_ignore});
-			if ($mastersite_regex) {
-				$ignored = 1 if ($site =~ /$mastersite_regex/);
+			# cleanup site and print to STDERR, ports need fixing
+			my $site_canonical = URI->new($site)->canonical;
+			if (length $site_canonical->host == 0) {
+				print STDERR "$fullpkgpath: empty host from "
+				    . "$site_canonical\n";
+				next;
+			}
+			$site_canonical =~ s/(?<!\:)\/+/\//g;
+			if ($site_canonical ne $site) {
+				# XXX too verbose ... those fix are cosmetic ?
+				#print STDERR "$fullpkgpath: FIX site "
+				#    . "$site -> $site_canonical\n";
+				info(1, $fullpkgpath, "FIX site "
+				    . "$site -> $site_canonical");
+				$site = $site_canonical;
 			}
 
-			push(@sites, $site) unless $ignored;
+			# mastersite to ignore ?
+			my $mastersite_regex = Portroach::Util::restrict2regex(
+			    $settings{mastersite_ignore});
+			if ($mastersite_regex && $site =~ /$mastersite_regex/) {
+				debug(__PACKAGE__, $port, "mastersite ignore "
+				    . "$site =~ $mastersite_regex");
+				next;
+			}
+
+			push(@sites, $site);
 		} catch {
 			print STDERR "$fullpkgpath: "
 			    . "caught error on $site:\n";
