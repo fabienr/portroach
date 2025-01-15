@@ -536,17 +536,6 @@ sub VersionCheck
 			} else {
 				$method = METHOD_HANDLER;
 			}
-
-			# Try harder, append distfile
-			# XXX s/distfiles/distfile/
-			if (!$method && !$sh->GetFiles(
-			    $site.$port->{distfiles}, $port, \@files)) {
-				info(1, $k, $host, 'SiteHandler::GetFiles() '
-				    . "failed for $site$port->{distfiles}");
-				next;
-			} else {
-				$method = METHOD_HANDLER;
-			}
 		}
 		elsif ($site->scheme eq 'ftp')
 		{
