@@ -141,380 +141,398 @@ sub BuildDB
 # Queries SQLports for:
 sub BuildPort
 {
-    my ($ps, $sdbh) = @_;
-    my (@ports, $q, $total_ports, $n_port, $rej, $meta, $dup, $bump, $up, $new);
-    $n_port = $rej = $meta = $dup = $bump = $up = $new = 0;
+	my ($ps, $sdbh) = @_;
+	my ($port, $q, $tot, $n, $rej, $meta, $dup, $bump, $up, $new);
+	# XXX $n = $rej = $meta = $dup = $bump = $up = $new = 0;
 
-    my $sths = {};
-    prepare_sql($sdbh, $sths, qw(ports_select ports_select_count
-                                 ports_restrict_maintainer ports_restrict_maintainer_count
-                                 ports_restrict_category ports_restrict_category_count
-				 ports_restrict_port  ports_restrict_port_count));
+	my $sths = {};
+	prepare_sql($sdbh, $sths, qw(
+	    ports_select ports_select_count
+	    ports_restrict_maintainer ports_restrict_maintainer_count
+	    ports_restrict_category ports_restrict_category_count
+	    ports_restrict_port ports_restrict_port_count));
 
-    # Apply any needed restrictions.
-    my $rc = 1; # report success only if not restricted
-    if ($settings{restrict_maintainer}) {
-	my $limit = "$settings{restrict_maintainer}%";
+	# Apply any needed restrictions.
+	my $rc = 0; # report success only if not restricted
 
-	$sths->{ports_restrict_maintainer}->execute($limit) or die DBI->errstr;
-	$sths->{ports_restrict_maintainer_count}->execute($limit) or die DBI->errstr;
+	if ($settings{restrict_maintainer}) {
+		my $limit = "$settings{restrict_maintainer}%";
 
-	$total_ports = $sths->{ports_restrict_maintainer_count}->fetchrow_array();
-	$q = $sths->{ports_restrict_maintainer};
-	$rc = 0;
-    } elsif ($settings{restrict_category}) {
-	my $limit = "$settings{restrict_category}";
+		$sths->{ports_restrict_maintainer}->execute($limit)
+		    or die DBI->errstr;
+		$sths->{ports_restrict_maintainer_count}->execute($limit)
+		    or die DBI->errstr;
 
-	$sths->{ports_restrict_category}->execute($limit) or die DBI->errstr;
-	$sths->{ports_restrict_category_count}->execute($limit) or die DBI->errstr;
+		$tot = $sths->{ports_restrict_maintainer_count}->fetchrow_array;
+		$q = $sths->{ports_restrict_maintainer};
 
-	$total_ports = $sths->{ports_restrict_category_count}->fetchrow_array();
-	$q = $sths->{ports_restrict_category};
-	$rc = 0;
-    } elsif ($settings{restrict_port}) {
-	my $limit = "%$settings{restrict_port}%";
+	} elsif ($settings{restrict_category}) {
+		my $limit = "$settings{restrict_category}";
 
-	$sths->{ports_restrict_port}->execute($limit) or die DBI->errstr;
-	$sths->{ports_restrict_port_count}->execute($limit) or die DBI->errstr;
+		$sths->{ports_restrict_category}->execute($limit)
+		    or die DBI->errstr;
+		$sths->{ports_restrict_category_count}->execute($limit)
+		    or die DBI->errstr;
 
-	$total_ports = $sths->{ports_restrict_port_count}->fetchrow_array();
-	$q = $sths->{ports_restrict_port};
-	$rc = 0;
-    } else {
-	$sths->{ports_select}->execute() or die DBI->errstr;
-	$sths->{ports_select_count}->execute() or die DBI->errstr;
+		$tot = $sths->{ports_restrict_category_count}->fetchrow_array;
+		$q = $sths->{ports_restrict_category};
 
-	$total_ports = $sths->{ports_select_count}->fetchrow_array();
-	$q = $sths->{ports_select};
-    }
+	} elsif ($settings{restrict_port}) {
+		my $limit = "%$settings{restrict_port}%";
 
-    if ($total_ports < 1) {
-	print STDERR "Nothing to build, invalid restrict_* settings ?\n";
-	return 0;
-    }
+		$sths->{ports_restrict_port}->execute($limit)
+		    or die DBI->errstr;
+		$sths->{ports_restrict_port_count}->execute($limit)
+		    or die DBI->errstr;
 
-    while(@ports = $q->fetchrow_array()) {
-	my (%pcfg, @sites, $fullpkgpath, $pkgname, $name,
-	    $category, $distname, $distfile, $path, $url, $maintainer,
-	    $comment, $sufx, $ver, $versrc, $basepkgpath, $pcfg_comment,
-	    $homepage, $port, $basename, $pathname, $basename_q, $pathname_q);
-	$n_port++;
+		$tot = $sths->{ports_restrict_port_count}->fetchrow_array;
+		$q = $sths->{ports_restrict_port};
 
-	$pkgname     = $ports[10];
-	$fullpkgpath = $ports[0];
-	$basepkgpath = tobasepkgpath($fullpkgpath);
-	$category    = primarycategory($ports[1]);
-
-	# Fake $port to ease debugging
-	$port = {'fullpkgpath' => $fullpkgpath,};
-
-	if ($category eq 'meta') {
-		info(1, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
-		    . "SKIP, meta package");
-		$meta++;
-		next;
-	}
-
-	# Bail out early if the port has no distfile to begin with
-	if (!$ports[3]) {
-		info(0, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
-		    . "SKIP, no distfile");
-		$rej++;
-		next;
-	}
-
-	# Extract name from pkgname but check dirname in case it's more explicit
-	$basename = $pkgname;
-	$basename =~ s/^(.*)-([^-]*)$/$1/g;
-	$pathname = fullpkgpathtoport($fullpkgpath);
-
-	# Chose the most precise name to insert in database, mostly for lookup
-	# XXX not that usefull afterall ?
-	if (index($pathname, $basename) != -1) {
-		debug(__PACKAGE__, $port, "prefer pkgpath, "
-		    . "name -> $pathname");
-		$name = $pathname;
 	} else {
-		debug(__PACKAGE__, $port, "prefer pkgname, "
-		    . "name -> $basename");
-		$name = $basename;
+		$sths->{ports_select}->execute()
+		    or die DBI->errstr;
+		$sths->{ports_select_count}->execute()
+		    or die DBI->errstr;
+
+		$tot = $sths->{ports_select_count}->fetchrow_array;
+		$q = $sths->{ports_select};
+		$rc = 1;
 	}
 
-	$distname = $ports[2];
-	# get rid of version/epoch markers
-	$distname =~ s/v[0-9]+$//;
-	$distname =~ s/p[0-9]+$//;
-
-	# ROACH_URL is UNIQUE ! one distfile only :)
-	$distfile = $ports[3];
-	# XXX site group spec. ?
-	$distfile =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
-
-	# detect path in distfile, move it into SITES
-	if ($distfile =~ /^(.*)\/(.*?)$/) {
-		debug(__PACKAGE__, $port, "path detected, "
-		    . "split $distfile -> $1 / $2");
-		$path = $1 . '/';
-		$distfile = $2;
+	if ($tot < 1) {
+		print STDERR "Nothing to build, "
+		    . "invalid restrict_* settings ?\n";
+		return 0;
 	}
 
-	# ports should not use encoded url
-	if ((my $file = uri_unescape($distfile)) ne $distfile) {
-		print STDERR "$fullpkgpath: FIX encoded url, "
-		    . "$distfile -> $file\n";
-		$distfile = $file;
-	}
+	while($port = $q->fetchrow_hashref()) {
+		my (%pcfg, @sites, $name, $category, $distname, $distfile,
+		    $path, $url, $sufx, $ver, $versrc, $basepkgpath, $basename,
+		    $pathname, $basename_q, $pathname_q);
+		$n++;
 
-	# detect url file?k=v;... and remove anything after '?'
-	if ($distfile =~ /\?/) {
-		$url = $distfile;
-		$distfile =~ s/\?.*$//;
-		info(1, $fullpkgpath,
-		    "url detected $url -> $distfile");
-	}
+		$basepkgpath = tobasepkgpath($port->{fullpkgpath});
+		$category    = primarycategory($port->{categories});
 
-	$maintainer = $ports[5];
-	$comment    = $ports[6];
-
-	foreach my $cfg (split /\s+/, $ports[7]) {
-		if ($cfg =~ /^([A-Za-z]+):(.*)$/i) {
-			$pcfg{lc $1} = $2;
-		} else {
-			print STDERR "$fullpkgpath: invalid portroach '$cfg'\n";
+		if ($category eq 'meta') {
+			info(1, $port->{fullpkgpath},
+			    "(".strchop($n,5)."/$tot) SKIP, meta package");
+			$meta++;
+			next;
 		}
-	}
-	$pcfg_comment = $ports[8];
-	$homepage = $ports[9];
-	info(1, $fullpkgpath, "SUFX? $distfile")
-	    unless ($sufx = extractsuffix($distfile));
-	foreach my $site (split /\s+/, $ports[4]) {
-		my $ignored = 0;
 
+		# Bail out early if the port has no distfile to begin with
+		if (!$port->{distfiles}) {
+			info(0, $port->{fullpkgpath},
+			    "(".strchop($n,5)."/$tot) SKIP, no distfile");
+			$rej++;
+			next;
+		}
+
+		# name from pkgname but check dirname in case it's more explicit
+		$basename = $port->{pkgname};
+		$basename =~ s/^(.*)-([^-]*)$/$1/g;
+		$pathname = fullpkgpathtoport($port->{fullpkgpath});
+
+		# select the most precise name to insert in database
+		# XXX not that usefull afterall ?
+		if (index($pathname, $basename) != -1) {
+			debug(__PACKAGE__, $port, "prefer pkgpath, "
+			    . "name -> $pathname");
+			$name = $pathname;
+		} else {
+			debug(__PACKAGE__, $port, "prefer pkgname, "
+			    . "name -> $basename");
+			$name = $basename;
+		}
+
+		$distname = $port->{distname};
+		# get rid of version/epoch markers
+		$distname =~ s/v[0-9]+$//;
+		$distname =~ s/p[0-9]+$//;
+
+		# ROACH_URL is UNIQUE ! one distfile only :)
+		$distfile = $port->{distfiles};
 		# XXX site group spec. ?
-		$site =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
-		$site =~ s/^\s+//;
-		$site =~ s/\/+$/\//;
-		if (length($site) == 0) {
-			print STDERR "$fullpkgpath: empty or no master sites\n";
-			next;
-		}
-		try {
-			# path detected in distfile, move it into SITES
-			unless ($site =~ /\/$/) {
-				print STDERR "$fullpkgpath: FIX site, "
-				    . "missing last '/' in $site\n";
-				$site .= '/';
-			}
-			$site .= $path if ($path);
+		$distfile =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
 
-			# cleanup site and print to STDERR, ports need fixing
-			my $site_canonical = URI->new($site)->canonical;
-			if (length $site_canonical->host == 0) {
-				print STDERR "$fullpkgpath: empty host from "
-				    . "$site_canonical\n";
-				next;
-			}
-			$site_canonical =~ s/(?<!\:)\/+/\//g;
-			if ($site_canonical ne $site) {
-				# XXX too verbose ... those fix are cosmetic ?
-				#print STDERR "$fullpkgpath: FIX site "
-				#    . "$site -> $site_canonical\n";
-				info(1, $fullpkgpath, "FIX site "
-				    . "$site -> $site_canonical");
-				$site = $site_canonical;
-			}
-
-			# mastersite to ignore ?
-			my $mastersite_regex = Portroach::Util::restrict2regex(
-			    $settings{mastersite_ignore});
-			if ($mastersite_regex && $site =~ /$mastersite_regex/) {
-				debug(__PACKAGE__, $port, "mastersite ignore "
-				    . "$site =~ $mastersite_regex");
-				next;
-			}
-
-			push(@sites, $site);
-		} catch {
-			print STDERR "$fullpkgpath: "
-			    . "caught error on $site:\n";
-			print STDERR "$fullpkgpath: $_";
-		};
-	}
-
-	debug(__PACKAGE__, $port, "pkg $pkgname: ".
-	    "distfile $distfile, distname $distname");
-
-	my $lang_re = '(node|p5|mod|py|ruby|hs)';
-	$basename_q = lc $basename;
-	debug(__PACKAGE__, $port, "basename optional [-_.] "
-	    . "$basename -> $basename_q")
-	    if ($basename_q =~ s/[\-\_\.]/\.?/g);
-	debug(__PACKAGE__, $port, "basename optional + "
-	    . "$basename -> $basename_q")
-	    if ($basename_q =~ s/\+/\\\+?/g);
-	debug(__PACKAGE__, $port, "basename optional lang "
-	    . "$basename -> $basename_q")
-	    if ($basename_q =~ /^$lang_re.+/ &&
-	    $basename_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
-	if ($basename ne $pathname) {
-		$pathname_q = lc $pathname;
-		debug(__PACKAGE__, $port, "pathname optional [-_.] "
-		    . "$pathname -> $pathname_q")
-		    if ($pathname_q =~ s/[\-\_\.]/\.?/g);
-		debug(__PACKAGE__, $port, "pathname optional + "
-		    . "$pathname -> $pathname_q")
-		    if ($pathname_q =~ s/\+/\\\+?/g);
-		debug(__PACKAGE__, $port, "pathname optional lang "
-		    . "$pathname -> $pathname_q")
-		    if ($pathname_q =~ /^$lang_re.+/ &&
-		    $pathname_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
-	}
-
-	foreach my $verdist ($distfile, $distname) {
-		if ($verdist !~ /\d/) {
-			debug(__PACKAGE__, $port, "skip, no digit in $verdist");
-			next;
+		# detect path in distfile, move it into SITES
+		if ($distfile =~ /^(.*)\/(.*?)$/) {
+			debug(__PACKAGE__, $port, "path detected, "
+			    . "split $distfile -> $1 / $2");
+			$path = $1 . '/';
+			$distfile = $2;
 		}
 
-		debug(__PACKAGE__, $port, "extract version from $verdist");
-		$ver = $versrc = $verdist;
+		# ports should not use encoded url
+		if ((my $file = uri_unescape($distfile)) ne $distfile) {
+			print STDERR "$port->{fullpkgpath}: FIX, encoded url "
+			    . "$distfile -> $file\n";
+			$distfile = $file;
+		}
 
-		# Alway start with lower case to ease further processing
-		$ver = lc $ver;
+		# detect url file?k=v;... and remove anything after '?'
+		if ($distfile =~ /\?/) {
+			$url = $distfile;
+			$distfile =~ s/\?.*$//;
+			info(1, $port->{fullpkgpath},
+			    "url detected $url -> $distfile");
+		}
 
-		debug(__PACKAGE__, $port, "trim .ext -> $ver")
-		    if ($ver =~ s/($ext_regex?)+$//);
-
-		debug(__PACKAGE__, $port, "trim path -> $ver")
-		    if ($ver =~ s/.*\///g);
-
-		# Remove names from pkgname/fullpkgpath, prefix & suffix
-		my @name_q;
-		if ($basename ne $pathname) {
-			# On conflict, try longest matche first
-			if (index($pathname, $basename) != -1) {
-				@name_q = ($pathname_q, $basename_q);
+		foreach my $cfg (split /\s+/, $port->{portroach}) {
+			if ($cfg =~ /^([A-Za-z]+):(.*)$/i) {
+				$pcfg{lc $1} = $2;
 			} else {
-				@name_q = ($basename_q, $pathname_q);
+				print STDERR "$port->{fullpkgpath}: "
+				    . "invalid portroach '$cfg'\n";
 			}
+		}
+
+		info(1, $port->{fullpkgpath}, "SUFX? $distfile")
+		    unless ($sufx = extractsuffix($distfile));
+
+		foreach my $site (split /\s+/, $port->{master_sites}) {
+			my $ignored = 0;
+
+			# XXX site group spec. ?
+			$site =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
+			$site =~ s/^\s+//;
+			$site =~ s/\/+$/\//;
+			if (length($site) == 0) {
+				print STDERR "$port->{fullpkgpath}: "
+				    . "no master sites\n";
+				next;
+			}
+			try {
+				# path detected in distfile, move it into SITES
+				unless ($site =~ /\/$/) {
+					print STDERR "$port->{fullpkgpath}: "
+					    . "FIX, missing last / in $site\n";
+					$site .= '/';
+				}
+				$site .= $path if ($path);
+
+				# cleanup site and print to STDERR
+				my $canonical = URI->new($site)->canonical;
+				if (length $canonical->host == 0) {
+					print STDERR "$port->{fullpkgpath}: "
+					    . "empty host $canonical\n";
+					next;
+				}
+				$canonical =~ s/(?<!\:)\/+/\//g;
+				if ($canonical ne $site) {
+					# XXX too verbose ... cosmetic ?
+					#print STDERR "$port->{fullpkgpath}: "
+					#   . "FIX, site $site -> $canonical\n";
+					info(1, $port->{fullpkgpath},
+					    "FIX, site $site -> $canonical");
+					$site = $canonical;
+				}
+
+				# mastersite to ignore ?
+				my $site_re = Portroach::Util::restrict2regex(
+				    $settings{mastersite_ignore});
+				if ($site_re && $site =~ /$site_re/) {
+					debug(__PACKAGE__, $port, "mastersite "
+					    . "ignore $site =~ $site_re");
+					next;
+				}
+
+				push(@sites, $site);
+
+			} catch {
+				print STDERR "$port->{fullpkgpath}: "
+				    . "caught error on $site:\n";
+				print STDERR "$port->{fullpkgpath}: $_";
+			};
+		}
+
+		debug(__PACKAGE__, $port, "pkg $port->{pkgname}: "
+		    . "distfile $distfile, distname $distname");
+
+		my $lang_re = '(node|p5|mod|py|ruby|hs)';
+		$basename_q = lc $basename;
+		debug(__PACKAGE__, $port, "basename optional [-_.] "
+		    . "$basename -> $basename_q")
+		    if ($basename_q =~ s/[\-\_\.]/\.?/g);
+		debug(__PACKAGE__, $port, "basename optional + "
+		    . "$basename -> $basename_q")
+		    if ($basename_q =~ s/\+/\\\+?/g);
+		debug(__PACKAGE__, $port, "basename optional lang "
+		    . "$basename -> $basename_q")
+		    if ($basename_q =~ /^$lang_re.+/ &&
+		        $basename_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
+		if ($basename ne $pathname) {
+			$pathname_q = lc $pathname;
+			debug(__PACKAGE__, $port, "pathname optional [-_.] "
+			    . "$pathname -> $pathname_q")
+			    if ($pathname_q =~ s/[\-\_\.]/\.?/g);
+			debug(__PACKAGE__, $port, "pathname optional + "
+			    . "$pathname -> $pathname_q")
+			    if ($pathname_q =~ s/\+/\\\+?/g);
+			debug(__PACKAGE__, $port, "pathname optional lang "
+			    . "$pathname -> $pathname_q")
+			    if ($pathname_q =~ /^$lang_re.+/ &&
+			$pathname_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
+		}
+
+		foreach my $verdist ($distfile, $distname) {
+			if ($verdist !~ /\d/) {
+				debug(__PACKAGE__, $port, "skip, "
+				    . "no digit in $verdist");
+				next;
+			}
+
+			debug(__PACKAGE__, $port, "extract ver from $verdist");
+			$ver = $versrc = $verdist;
+
+			# Alway start with lower case to ease further processing
+			$ver = lc $ver;
+
+			debug(__PACKAGE__, $port, "trim .ext -> $ver")
+			    if ($ver =~ s/($ext_regex?)+$//);
+
+			debug(__PACKAGE__, $port, "trim path -> $ver")
+			    if ($ver =~ s/.*\///g);
+
+			# Remove names from pkgname/fullpkgpath, prefix & suffix
+			my @name_q;
+			if ($basename ne $pathname) {
+				# On conflict, try longest matche first
+				if (index($pathname, $basename) != -1) {
+					@name_q = ($pathname_q, $basename_q);
+				} else {
+					@name_q = ($basename_q, $pathname_q);
+				}
+			} else {
+				@name_q = ($basename_q,);
+			}
+			foreach my $q (@name_q) {
+				# Remove prefix / suffix
+				debug(__PACKAGE__, $port, ".*$q\[-_.] -> $ver")
+				    if ($ver =~ s/^.*($q[-_\.])//);
+				debug(__PACKAGE__, $port, "[-_.]$q.* -> $ver")
+				    if ($ver =~ s/([-_\.]$q).*$//);
+
+				# Try harder, remove prefix with no separator
+				# XXX could be shorter
+				debug(__PACKAGE__, $port,
+				    ".*$q \\d.\\d... -> $ver")
+				    if ($ver =~
+				        s/^.*($q)(\d+\.\d+[\w\d\.]*)$/$2/);
+				debug(__PACKAGE__, $port,
+				    ".*$q \\d_\\d... -> $ver")
+				    if ($ver =~
+				        s/^.*($q)(\d+\_\d+[\w\d\_]*)$/$2/);
+				debug(__PACKAGE__, $port,
+				    ".*$q \\d-\\d... -> $ver")
+				    if ($ver =~
+				        s/^.*($q)(\d+\-\d+[\w\d\-]*)$/$2/);
+			}
+
+			# Remove common suffix
+			my $chop_regex = qr/addons|all|bin|darwin|build|
+			    builtpkgs|dist|gh|image|languages|linux|noarch|
+			    openbsd|orig|plugin|release|sources?|src|stable|
+			    standalone|rpm|unix|utf-8|with|x86(_64)?|x64?/x;
+			debug(__PACKAGE__, $port, "chop -> $ver")
+			    if ($ver =~ s/([\.\-\_]?($chop_regex))+$//g);
+
+			# Remove all '-' prefix, most common cases
+			if ($ver =~ /^(\D[^-]*-)+(.*)$/) {
+				$ver = $2;
+				debug(__PACKAGE__, $port,
+				    "trim \\D...- -> $ver");
+			}
+
+			# Try harder, match digit-nodigit-version
+			# XXX ?
+			if ($ver =~ /^\d[^-]*-\D*-(.*)$/) {
+				$ver = $1;
+				debug(__PACKAGE__, $port,
+				    "trim \\d...-\\D...- -> $ver");
+			}
+
+			# Remove everything up to the first version-like digits,
+			# only if name does not contain any digit.
+			# XXX FIXME comments differ a bit -> code adjustment
+			debug(__PACKAGE__, $port, "no digit, trim \\D -> $ver")
+			    if ($name !~ /\d/ && $ver =~ /\d+[\.\-\_]\d/ &&
+			        $ver =~ s/^\D+(\d.*)$/$1/);
+
+			# Remove common prefix version marker
+			debug(__PACKAGE__, $port, "trim (v...|r...) -> $ver")
+			    if ($ver =~ s/^$verprfx_regex//);
+
+			# Bruteforce, remove uncommon separator prefix
+			# XXX maybe merge this with '-' and use a foreeach $sep
+			debug(__PACKAGE__, $port, "trim \\D...(.|_) -> $ver")
+			    if ($ver =~ s/^(\D[^\._]*(\.|_))+(.*)$/$3/);
+
+			# Finally, check we got something plausible
+			unless (isversion($ver)) {
+				debug(__PACKAGE__, $port, 
+				    "discard invalid version $ver");
+				$ver = undef;
+			}
+
+			last if ($ver);
+		}
+
+		# XXX fallback on site/path/$V/distfile for version detection ?
+
+		unless ($ver) {
+			$ver = $versrc = $port->{pkgname};
+			# Alway start with lower case to ease further processing
+			$ver = lc $ver;
+			$ver =~ s/^(.*)-([^-]*)$/$2/g;
+			debug(__PACKAGE__, $port,
+			    "fallback on pkgname version $ver");
+		}
+
+		debug(__PACKAGE__, $port, "$versrc -> $ver");
+
+		my $rc = $ps->AddPort({
+		    'name'        => $name,
+		    'cat'         => $category,
+		    'ver'         => $ver,
+		    'maintainer'  => $port->{maintainer},
+		    'comment'     => $port->{comment},
+		    'distname'    => $distname,
+		    'sufx'        => $sufx,
+		    'distfile'    => $url ? $url : $distfile,
+		    'sites'       => \@sites,
+		    'options'     => \%pcfg,
+		    'pcfg_comment'=> $port->{portroach_comment},
+		    'homepage'    => $port->{homepage},
+		    'basepkgpath' => $basepkgpath,
+		    'fullpkgpath' => $port->{fullpkgpath},
+		});
+		if (!$rc) {
+			$rej++;
+			info(0, $port->{fullpkgpath},
+			    "(".strchop($n,5)."/$tot) REJ, $ver");
+		} elsif ($rc == 4) {
+			$dup++;
+			info(1, $port->{fullpkgpath},
+			    "(".strchop($n,5)."/$tot) DUP, $ver");
+		} elsif ($rc == 3) {
+			$bump++;
+			info(0, $port->{fullpkgpath},
+			    "(".strchop($n,5)."/$tot) BUMP, $ver");
+		} elsif ($rc == 2) {
+			$up++;
+			info(1, $port->{fullpkgpath},
+			    "(".strchop($n,5)."/$tot) UP, $ver");
 		} else {
-			@name_q = ($basename_q,);
+			$new++;
+			info(0, $port->{fullpkgpath},
+			    "(".strchop($n,5)."/$tot) NEW, $ver");
 		}
-		foreach my $q (@name_q) {
-			# Remove prefix / suffix
-			debug(__PACKAGE__, $port, ".*$q\[-_.] * -> $ver")
-			    if ($ver =~ s/^.*($q[-_\.])//);
-			debug(__PACKAGE__, $port, "* [-_.]$q.* -> $ver")
-			    if ($ver =~ s/([-_\.]$q).*$//);
-
-			# Try harder, remove prefix with no separator
-			# XXX could be shorter
-			debug(__PACKAGE__, $port, ".*$q \\d.\\d... -> $ver")
-			    if ($ver =~ s/^.*($q)(\d+\.\d+[\w\d\.]*)$/$2/);
-			debug(__PACKAGE__, $port, ".*$q \\d_\\d... -> $ver")
-			    if ($ver =~ s/^.*($q)(\d+\_\d+[\w\d\_]*)$/$2/);
-			debug(__PACKAGE__, $port, ".*$q \\d-\\d... -> $ver")
-			    if ($ver =~ s/^.*($q)(\d+\-\d+[\w\d\-]*)$/$2/);
-		}
-
-		# Remove common suffix
-		my $chop_regex = qr/addons|all|bin|darwin|build|builtpkgs|dist|
-		    gh|image|languages|linux|noarch|openbsd|orig|plugin|release|
-		    sources?|src|stable|standalone|rpm|unix|utf-8|with|
-		    x86(_64)?|x64?/x;
-		debug(__PACKAGE__, $port, "chop -> $ver")
-		    if ($ver =~ s/([\.\-\_]?($chop_regex))+$//g);
-
-		# Remove all '-' prefix, most common cases
-		if ($ver =~ /^(\D[^-]*-)+(.*)$/) {
-			$ver = $2;
-			debug(__PACKAGE__, $port,
-			    "trim \\D...- -> $ver");
-		}
-		# Try harder, match digit-nodigit-version
-		if ($ver =~ /^(\d[^-]*-)(\D[^-]*-)+(.*)$/) {
-			$ver = $3;
-			debug(__PACKAGE__, $port,
-			    "trim \\d...-\\D...- -> $ver");
-		}
-
-		# Remove everything up to the first version-like digits,
-		# only if name does not contain any digit.
-		# XXX FIXME comments / code differ a bit -> code adjustment
-		debug(__PACKAGE__, $port, "no digit, trim \\D -> $ver")
-		    if ($name !~ /\d/ && $ver =~ /\d+[\.\-\_]\d/ &&
-		    $ver =~ s/^\D+(\d.*)$/$1/);
-
-		# Remove common prefix version marker
-		debug(__PACKAGE__, $port, "trim (v...|r...) -> $ver")
-		    if ($ver =~ s/^$verprfx_regex//);
-
-		# Bruteforce, remove uncommon separator prefix
-		# XXX maybe merge this with '-' and use a foreeach $sep
-		debug(__PACKAGE__, $port, "trim \\D...(.|_) -> $ver")
-		    if ($ver =~ s/^(\D[^\._]*(\.|_))+(.*)$/$3/);
-
-		# Finally, check we got something plausible
-		unless (isversion($ver)) {
-			debug(__PACKAGE__, $port, 
-			    "discard invalid version $ver");
-			$ver = undef;
-		}
-
-		last if ($ver);
 	}
-	unless ($ver) {
-		$ver = $versrc = $pkgname;
-		# Alway start with lower case to ease further processing
-		$ver = lc $ver;
-		$ver =~ s/^(.*)-([^-]*)$/$2/g;
-		debug(__PACKAGE__, $port, 
-		    "fallback on pkgname version $ver");
-	}
-
-	debug(__PACKAGE__, $port, "$versrc -> $ver");
-
-	my $rc = $ps->AddPort({
-	    'name'        => $name,
-	    'cat'         => $category,
-	    'ver'         => $ver,
-	    'maintainer'  => $maintainer,
-	    'comment'     => $comment,
-	    'distname'    => $distname,
-	    'sufx'        => $sufx,
-	    'distfile'    => $url ? $url : $distfile,
-	    'sites'       => \@sites,
-	    'options'     => \%pcfg,
-	    'pcfg_comment'=> $pcfg_comment,
-	    'homepage'    => $homepage,
-	    'basepkgpath' => $basepkgpath,
-	    'fullpkgpath' => $fullpkgpath,
-	});
-	if (!$rc) {
-		$rej++;
-		info(0, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
-		    . " REJ, $ver");
-	} elsif ($rc == 4) {
-		$dup++;
-		info(1, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
-		    . " DUP, $ver");
-	} elsif ($rc == 3) {
-		$bump++;
-		info(0, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
-		    . "BUMP, $ver");
-	} elsif ($rc == 2) {
-		$up++;
-		info(1, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
-		    . "  UP, $ver");
-	} else {
-		$new++;
-		info(0, $fullpkgpath, "(".strchop($n_port,5)."/$total_ports) "
-		    . " NEW, $ver");
-	}
-    }
-    print "($total_ports) Build done: new $new, up. $up, "
-        . "bump(ver) $bump / rej. $rej, meta $meta, dup. $dup\n";
-    return $rc;
+	print "($tot) Build done: new $new, up. $up, "
+	    . "bump(ver) $bump / rej. $rej, meta $meta, dup. $dup\n";
+	return $rc;
 }
 
 1;
