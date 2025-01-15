@@ -245,8 +245,9 @@ sub BuildPort
 	$distname =~ s/v[0-9]+$//;
 	$distname =~ s/p[0-9]+$//;
 
-	# XXX ROACH_URL is UNIQUE ! one distfile only :)
+	# ROACH_URL is UNIQUE ! one distfile only :)
 	$distfile = $ports[3];
+	# XXX site group spec. ?
 	$distfile =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
 
 	# detect path in distfile, move it into SITES
@@ -289,9 +290,10 @@ sub BuildPort
 	foreach my $site (split /\s+/, $ports[4]) {
 		my $ignored = 0;
 
+		# XXX site group spec. ?
+		$site =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
 		$site =~ s/^\s+//;
 		$site =~ s/\/+$/\//;
-		$site =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g; # site group spec.
 		if (length($site) == 0) {
 			print STDERR "$fullpkgpath: empty or no master sites\n";
 			next;
