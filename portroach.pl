@@ -869,14 +869,6 @@ sub VersionCheck
 		# Make note of working site
 		$sths->{sitedata_success}->execute($site->host);
 
-		if ($method == METHOD_HANDLER && !@files) {
-			# XXX github return no file if old found in last release
-			$sths->{portdata_setmethod}->execute(
-				$method,
-				$port->{id}
-			) unless ($settings{precious_data});
-			$found = 1 if (!$found); # $old_found = 1
-		}
 		next if (!@files);
 
 		info(1, $k, $host, 'Found ' . scalar @files . ' files');
