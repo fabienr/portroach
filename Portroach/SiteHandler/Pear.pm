@@ -17,6 +17,7 @@
 
 package Portroach::SiteHandler::Pear;
 
+use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;

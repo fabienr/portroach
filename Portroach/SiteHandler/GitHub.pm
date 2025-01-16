@@ -20,6 +20,7 @@ package Portroach::SiteHandler::GitHub;
 use JSON qw(decode_json);
 use URI;
 
+use Portroach::SiteHandler;
 use Portroach::Util;
 use Portroach::Config;
 

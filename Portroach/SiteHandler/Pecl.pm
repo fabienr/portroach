@@ -17,6 +17,7 @@
 
 package Portroach::SiteHandler::Pecl;
 
+use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;

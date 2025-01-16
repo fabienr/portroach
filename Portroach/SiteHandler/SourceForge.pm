@@ -29,6 +29,7 @@ package Portroach::SiteHandler::SourceForge;
 
 use XML::Feed;
 
+use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;

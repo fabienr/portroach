@@ -19,6 +19,7 @@ package Portroach::SiteHandler::Hackage;
 
 use HTML::TokeParser;
 
+use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;

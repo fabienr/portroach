@@ -27,6 +27,7 @@
 
 package Portroach::SiteHandler::Mozilla;
 
+use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;

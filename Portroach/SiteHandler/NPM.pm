@@ -19,6 +19,7 @@ package Portroach::SiteHandler::NPM;
 
 use JSON qw(decode_json);
 
+use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;
