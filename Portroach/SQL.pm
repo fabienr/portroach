@@ -223,6 +223,13 @@ $sql{sitedata_select} =
 	   WHERE host = ?
 	     AND ignore is not true);
 
+$sql{sitedata_reset} =q(
+	UPDATE sitedata
+	SET
+		successes = 0,
+		failures = 0
+);
+
 $sql{sitedata_failure} =
 	q(UPDATE sitedata
 	     SET failures = failures + 1

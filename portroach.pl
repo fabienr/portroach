@@ -297,7 +297,8 @@ sub Check
 
 	$dbh = connect_db();
 
-	prepare_sql($dbh, \%sths, qw(portdata_count portdata_select));
+	prepare_sql($dbh, \%sths, qw(
+	    portdata_count portdata_select sitedata_reset));
 
 	STDOUT->autoflush(1);
 
@@ -305,6 +306,14 @@ sub Check
 	($num_rows) = $sths{portdata_count}->fetchrow_array;
 
 	$sths{portdata_select}->execute(lc hostname());
+
+	# Reset sitedata counter on full check (with no restriction)
+	if (!$settings{restrict_port} &&
+	    !$settings{restrict_category} &&
+	    !$settings{restrict_maintainer}) {
+		$sths{sitedata_reset}->execute;
+		info(0, "Doing full check, reset site data.");
+	}
 
 	if ($nofork) {
 		prepare_sql($dbh, \%sths, qw(
@@ -329,7 +338,8 @@ sub Check
 
 		$i++;
 
-		$want = wantport($port->{name}, $port->{cat}, $port->{maintainer});
+		$want = wantport($port->{name}, $port->{cat},
+		    $port->{maintainer});
 
 		if ($nofork) {
 			# This is all we need if we're not forking.
@@ -351,7 +361,8 @@ sub Check
 			if ($pid) {
 				# Parent
 				my $progress = $num_rows - $i;
-				info(1, "PID #$$", "Spawned ($progress ports unallocated)");
+				info(1, "PID #$$",
+				    "Spawned ($progress ports unallocated)");
 				undef @workblock;
 			} else {
 				# Child
@@ -383,7 +394,8 @@ sub Check
 				$dbh->disconnect;
 
 				$time = (time - $time);
-				info(1, "PID #$$", "finished work block (took $time seconds)");
+				info(1, "PID #$$",
+				    "finished work block (took $time seconds)");
 
 				exit;
 			}
@@ -396,10 +408,11 @@ sub Check
 
 	if ($sths{portdata_select}->rows == 0) {
 		print "No ports found.\n";
+	} elsif (!$nofork) {
+		print "Master process finished. "
+		    . "All work has been distributed.\n"
 	} else {
-		print !$nofork
-			? "Master process finished. All work has been distributed.\n"
-			: "Finished.\n";
+		print "Finished.\n";
 	}
 
 	finish_sql($dbh, \%sths);
