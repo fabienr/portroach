@@ -262,6 +262,14 @@ sub BuildPort
 		# XXX site group spec. ?
 		$distfile =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
 
+		# detect url file?k=v;... and remove anything after '?'
+		if ($distfile =~ /\?/) {
+			$url = $distfile;
+			$distfile =~ s/\?.*$//;
+			info(1, $port->{fullpkgpath},
+			    "url detected $url -> $distfile");
+		}
+
 		# detect path in distfile, move it into SITES
 		if ($distfile =~ /^(.*)\/(.*?)$/) {
 			debug(__PACKAGE__, $port, "path detected, "
@@ -275,14 +283,6 @@ sub BuildPort
 			print STDERR "$port->{fullpkgpath}: FIX, encoded url "
 			    . "$distfile -> $file\n";
 			$distfile = $file;
-		}
-
-		# detect url file?k=v;... and remove anything after '?'
-		if ($distfile =~ /\?/) {
-			$url = $distfile;
-			$distfile =~ s/\?.*$//;
-			info(1, $port->{fullpkgpath},
-			    "url detected $url -> $distfile");
 		}
 
 		foreach my $cfg (split /\s+/, $port->{portroach}) {
@@ -397,9 +397,6 @@ sub BuildPort
 
 			debug(__PACKAGE__, $port, "trim .ext -> $ver")
 			    if ($ver =~ s/($ext_regex?)+$//);
-
-			debug(__PACKAGE__, $port, "trim path -> $ver")
-			    if ($ver =~ s/.*\///g);
 
 			# Remove names from pkgname/fullpkgpath, prefix & suffix
 			my @name_q;
