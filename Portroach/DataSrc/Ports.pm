@@ -285,6 +285,7 @@ sub BuildPort
 			$distfile = $file;
 		}
 
+		# sanitize portroach config
 		foreach my $cfg (split /\s+/, $port->{portroach}) {
 			if ($cfg =~ /^([A-Za-z]+):(.*)$/i) {
 				$pcfg{lc $1} = $2;
@@ -309,7 +310,7 @@ sub BuildPort
 				    . "no master sites\n";
 				next;
 			}
-			
+
 			# path detected in distfile, move it into SITES
 			unless ($site =~ /\/$/) {
 				print STDERR "$port->{fullpkgpath}: "
@@ -321,18 +322,16 @@ sub BuildPort
 			try {
 				# canonical site and print to STDERR
 				$canon = URI->new($site)->canonical;
+				if (length $canon->host == 0) {
+					print STDERR "$port->{fullpkgpath}: "
+					    . "empty host $canon\n";
+					next;
+				}
 			} catch {
 				print STDERR "$port->{fullpkgpath}: "
 				    . "caught error on $site\n";
 				debug(__PACKAGE__, $port, "$_");
-				next;
-			};
-
-			if (length $canon->host == 0) {
-				print STDERR "$port->{fullpkgpath}: "
-				    . "empty host $canon\n";
-				next;
-			}
+			} and next;
 
 			# check if path is absolute in the port
 			# XXX verbose, looks cosmetic
