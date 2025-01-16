@@ -89,7 +89,6 @@ sub GetFiles
 
 	$old_v = quotemeta $port->{ver};
 	$sufx = quotemeta $port->{sufx};
-	$distfile = $port->{distfiles};
 
 	# XXX $port->{newver} ? $port->{newver} : $port->{ver}
 	foreach (verguess($curr_v, $port->{limitwhich})) {
@@ -128,6 +127,8 @@ sub GetFiles
 		info(1, $port->{fullpkgpath}, $url->host,
 		    "Guessing version $port->{ver} -> $guess_v");
 
+		my $url = $url->clone;
+		$distfile = $port->{distfiles};
 		next unless ($distfile =~ s/$old_v/$guess_v/gi);
 
 		if ($path_ver) {
@@ -154,9 +155,9 @@ sub GetFiles
 			push @$files, "$url$distfile";
 			last;
 		} elsif (!$resp->is_success) {
-			info(1, $port->{fullpkgpath}, strchop($url, 60)
+			info(1, $port->{fullpkgpath},
+			    strchop($url.$distfile, 60)
 			    . ': ' . $resp->status_line);
-			return 0;
 		} else {
 			info(1, $port->{fullpkgpath}, $url->host,
 			    "Guess failed $port->{ver} -> $guess_v");

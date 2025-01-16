@@ -582,7 +582,7 @@ sub VersionCheck
 				info(1, $k, $host, "$sh->{name} GetFiles() "
 				    . "failed for $site");
 				$sths->{sitedata_failure}->execute($site->host);
-				next;
+				# not next; give a chance to HttpGuess
 			} else {
 				$sths->{sitedata_success}->execute($site->host);
 				$method = METHOD_LIST if (@files);
@@ -632,7 +632,8 @@ sub VersionCheck
 
 			# New we are ready to guess ...
 			$sh = Portroach::SiteHandler::HttpGuess->new;
-			if (!$sh->GetFiles($site, $port, \@files, $path_ver)) {
+			my $ver = $port->{ver}; # XXX search new version again
+			if (!$sh->GetFiles($site,$port,\@files,$path_ver,$ver)) {
 				info(1, $k, $host, "$sh->{name} GetFiles() "
 				    . "failed for $site");
 				$sths->{sitedata_failure}->execute($site->host);
@@ -908,14 +909,12 @@ sub FindNewestFile
 
 			unless (($1.$2) =~
 			    /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/i) {
-
 				my $fullver = '';
 				while ($vo_nums =~ s/^(\d+?)[-_\.]?//) {
 					$fullver .= $1;
 					last if ($fullver eq $nm_nums);
 				}
 
-				
 				if ($fullver eq $nm_nums) {
 					debug(__PACKAGE__, $port,
 					   "fullver $fullver nm_nums $nm_nums");
@@ -961,13 +960,13 @@ sub FindNewestFile
 					$poss_url = $site->clone;
 					$poss_url->path($poss_path)
 					    if ($poss_path);
-					$poss_url->path($poss_url->path . '/')
-					    if ($poss_url !~ /\/$/);
 				}
 				if ($vercheck) {
 					# XXX stupid but works
 					$poss_url = "";
 				} else {
+					$poss_url->path($poss_url->path . '/')
+					    if ($poss_url !~ /\/$/);
 					uri_filename($poss_url, $file);
 				}
 				debug(__PACKAGE__, $port, "last found "

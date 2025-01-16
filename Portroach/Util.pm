@@ -302,7 +302,7 @@ sub nametoregex
 
 	$regex =~ s/[\+\?\{\}]/\\$1?/g;
 	$regex =~ s/[\-\_\.]/\.?/g;
-	$regex =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/
+	$regex =~ s/^$lang_re\\?[\-\_]?/(?:$1)?\[\\-\\_\]?/
 	    if ($regex =~ /^$lang_re.+/);
 
 	return $regex;
