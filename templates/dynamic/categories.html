@@ -10,7 +10,7 @@
 <body>
 
     <div class="header">
-        portroach - %%(index)'s ports
+        portroach - OpenBSD Ports Distfile Scanner
         <div class="menu">
             <a href="index.html">Home</a>
             <a href="sites.html">Sites</a>
@@ -26,24 +26,14 @@
     </p>
 
     <div>
-        <p>
-            Notes:
-            <ul>
-                <li>Port version strings are derived from DISTNAME values; they are not in "ports format"</li>
-                <li>
-                    Updated/Checked time is when the database was updated and when a new distfile scan was
-                    done, respectively.
-                </li>
-            </ul>
+        <p class="summary">
+            Summary:<br>
+            Total distfiles: %%(total_ports)<br>
+            Outdated distfiles: %%(total_outdated) (%%(outdated_percentage)%)<br>
+            Maintainers: %%(total_maintainers)
         </p>
         <p>
-            <ul>
-                <li>Port and New Version columns are clickable</li>
-                <li>Table headings are clickable for different sorting.</li>
-            </ul>
-        </p>
-        <p>
-            Key for the 'M' column:
+            Description for the columns:
         </p>
         <ul>
             <li>G = file was found by sending incremental version guesses to server.</li>
@@ -55,9 +45,10 @@
         <p></p>
     </div>
 
+
     <form class="filter-box ">
         <fieldset class="filter-box">
-            Filter Distfile (by pkgpath): <input tabindex="1" data-filter="0">
+            Filter Category: <input tabindex="1" data-filter="0">
             Outdated only? <input tabindex="2" type="checkbox" data-filter="3">
         </fieldset>
     </form>
@@ -65,22 +56,28 @@
     <table>
         <thead>
             <tr>
-                <th data-sortable="str" class="asc">Pkgpath</th>
-                <th data-sortable="str">Current</th>
-                <th data-sortable="str">New</th>
-                <th data-sortable="str">Last Updated</th>
-                <th data-sortable="str">Last Checked</th>
-                <th data-sortable="str">M</th>
+                <th data-sortable="str" class="asc">Category</th>
+                <th data-sortable>Total distfiles</th>
+                <th data-sortable>New Distfile(s)</th>
+                <th data-sortable>% Out of Date</th>
+                <th data-sortable>G</th>
+                <th data-sortable>L</th>
+                <th data-sortable>X</th>
+                <th data-sortable>S</th>
+                <th data-sortable>?</th>
             </tr>
         </thead>
         <tbody>
 %%:         <tr>
-%%:             <td>%%(head)</td>
-%%:             <td><a href="http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/%%(basepkgpath)">%%(ver)</a></td>
-%%:             <td>%%(newver)</td>
-%%:             <td>%%(updated)</td>
-%%:             <td>%%(checked)</td>
-%%:             <td>%%(method)</td>
+%%:             <td><a href="%%(link).html">%%(cat)</a></td>
+%%:             <td>%%(total)</td>
+%%:             <td>%%(withnewdistfile)</td>
+%%:             <td>%%(percentage)%</td>
+%%:             <td>%%(guessed)</td>
+%%:             <td>%%(indexed)</td>
+%%:             <td>%%(ignored)</td>
+%%:             <td>%%(handled)</td>
+%%:             <td>%%(unknow)</td>
 %%:         </tr>
         </tbody>
     </table>

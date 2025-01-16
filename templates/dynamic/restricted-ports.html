@@ -1,71 +1,76 @@
 <!DOCTYPE html>
-<html ng-app="portroach">
+<html>
 
-    <head>
-	<script type="text/javascript" src="assets/angular.min.js"></script>
-        <title>portroach - new distfile scanner</title>
-	<link rel="icon" type="image/ico" href="assets/favicon.ico"/>
-	<link href="assets/portroach.css" rel="stylesheet" type="text/css"/>
-    </head>
+<head>
+    <link rel="icon" type="image/ico" href="assets/favicon.ico"/>
+    <link href="assets/portroach.css" rel="stylesheet" type="text/css"/>
+    <title>portroach - new distfile scanner</title>
+</head>
 
-    <body ng-controller="RestrictedController as restricted" ng-init="predicate='basepkgpath'">
+<body>
 
-<div class="header">
-    portroach - restricted ports
-  <div class="menu">
-    <a href="index.html">Home</a>
-    <a href="sites.html">Sites</a>
-    <a href="maintainers.html">Maintainers</a>
-    <a href="restricted-ports.html">Restricted</a>
-  </div>
-</div>
+    <div class="header">
+        portroach - restricted ports
+        <div class="menu">
+            <a href="index.html">Home</a>
+            <a href="sites.html">Sites</a>
+            <a href="maintainers.html">Maintainers</a>
+            <a href="restricted-ports.html">Restricted</a>
+        </div>
+    </div>
 
-<hr>
+    <hr>
 
+    <p class="intro">
+        Generated on %%(date) at %%(time), by <a href="http://jasperla.github.io/portroach/">portroach</a> v%%(appver)
+    </p>
+
+    <div>
         <p>
             Notes:
             <ul>
-                <li>
-                    <b>Limit Regex</b> is a Perl regular expression used to limit the port's version.
+                <li><b>Limit Regex</b> is a Perl regular expression used to
+                    limit the port's version.</li>
+                <li><b>Limit Even/Odd</b> tells portroach to limit the
+                    (<i>n</i>+1)th number to even or odd numbers only.
                 </li>
-		        <li>
-		            <b>Limit Even/Odd</b> tells portroach to limit the (<i>n</i>+1)th number to even or
-	                odd numbers only.
-	            </li>
-	            <li>
-	                Ports with a version number in their name are automatically dealt with.
-	            </li>
-	        </ul>
+                <li>Ports with a version number in their name are automatically
+                    dealt with.
+                </li>
+            </ul>
         </p>
+        <p></p>
+    </div>
 
-    <form class="filter-box">
-      <fieldset class="filter-box">
-        Filter Distfile (by pkgpath): <input tabindex="1" ng-model="search.basepkgpath">
-      </fieldset>
+    <form class="filter-box ">
+        <fieldset class="filter-box">
+            Filter Distfile (by pkgpath): <input tabindex="1" data-filter="0">
+        </fieldset>
     </form>
 
-    <table class="results" cellspacing="1" cellpadding="2">
-      <tbody id="results">
-            <tr class="resultshead">
-                <td><a href="" ng-click="predicate = 'basepkgpath'; reverse=false">Pkgpath</a></td>
-                <td>Limit Regex</td>
-                <td>Limit Even/Odd</td>
-                <td>Skip Versions</td>
-		<td>Comment</td>
+    <table>
+        <thead>
+            <tr>
+                <th data-sortable="str" class="asc">Pkgpath</th>
+                <th data-sortable="str">Limit Regex</th>
+                <th data-sortable="str">Limit Even/Odd</th>
+                <th data-sortable="str">Skip Versions</th>
+                <th data-sortable="str">Comment</th>
             </tr>
-
-   	        <tr id="loading" ng-show="loading"><td colspan="5">Loading...</td></tr>
-
-            <tr class="resultshow" ng-repeat="port in restricted.ports | filter:search | orderBy:predicate:reverse">
-                <td><a href="http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/{{ port.basepkgpath }}">{{ port.basepkgpath }}</a></td>
-                <td>{{ port.limitver }}</td>
-                <td>{{ port.limitevenwhich }}</td>
-                <td>{{ port.skipversions }}</td>
-		<td>{{ port.pcfg_comment }}</td>
-            </tr>
-	  </tbody>
-        </table>
+        </thead>
+        <tbody>
+%%:         <tr>
+%%:             <td><a href="http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/%%(basepkgpath)">%%(basepkgpath)</a></td>
+%%:             <td>%%(limitver)</td>
+%%:             <td>%%(limitevenwhich)</td>
+%%:             <td>%%(skipversions)</td>
+%%:             <td>%%(pcfg_comment)</td>
+%%:         </tr>
+        </tbody>
+    </table>
 
     <script type="text/javascript" src="assets/app.js"></script>
+
 </body>
+
 </html>

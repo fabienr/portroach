@@ -81,12 +81,18 @@ $$sql{portdata_gencategories} =
 	         total,
 	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
 	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0)
-	           AS FLOAT) AS percentage
+	           AS FLOAT) AS percentage,
+	         unknow, guessed, indexed, handled, ignored
 
 	    FROM (
 	  SELECT cat,
 	         COUNT(maintainer) AS total,
-	         COUNT(newver != ver) AS withnewdistfile
+	         COUNT(newver != ver) AS withnewdistfile,
+	         COUNT(CASE WHEN (method=0 AND ignore=False) THEN 1 END) AS unknow,
+	         COUNT(CASE WHEN method=1 THEN 1 END) AS guessed,
+	         COUNT(CASE WHEN method=2 THEN 1 END) AS indexed,
+	         COUNT(CASE WHEN method=3 THEN 1 END) AS handled,
+	         COUNT(CASE WHEN ignore=True THEN 1 END) AS ignored
 	    FROM portdata
 	GROUP BY cat
 	));
@@ -97,12 +103,18 @@ $$sql{portdata_gensites} =
 	         total,
 	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
 	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0)
-	           AS FLOAT) AS percentage
+	           AS FLOAT) AS percentage,
+	         unknow, failures, successes, liecount, robots_nextcheck
 
 	    FROM (
 	  SELECT sitedata.host,
 	         COUNT(maintainer) AS total,
-	         COUNT(newver != ver) AS withnewdistfile
+	         COUNT(newver != ver) AS withnewdistfile,
+	         COUNT(CASE WHEN (method=0 AND portdata.ignore=False) THEN 1 END) AS unknow,
+	         SUM(sitedata.failures) AS failures,
+	         SUM(sitedata.successes) AS successes,
+	         SUM(sitedata.liecount) AS liecount,
+	         MIN(sitedata.robots_nextcheck) AS robots_nextcheck
 	    FROM portdata
 	    INNER JOIN sitedata
 	      ON lower(mastersites) LIKE '%' || sitedata.host || '%'

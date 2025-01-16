@@ -1,63 +1,91 @@
 <!DOCTYPE html>
-<html ng-app="portroach">
+<html>
 
 <head>
-	<script type="text/javascript" src="assets/angular.min.js"></script>
-	<title>portroach - new distfile scanner</title>
-	<link rel="icon" type="image/ico" href="assets/favicon.ico"/>
-	<link href="assets/portroach.css" rel="stylesheet" type="text/css"/>
+    <link rel="icon" type="image/ico" href="assets/favicon.ico"/>
+    <link href="assets/portroach.css" rel="stylesheet" type="text/css"/>
+    <title>portroach - new distfile scanner</title>
 </head>
 
-<body ng-controller="OverviewController as overview" ng-init="index='%%(index)';predicate='total';reverse=true">
+<body>
 
-<div class="header">
-  portroach - OpenBSD Ports Distfile Scanner
-  <div class="menu">
-    <a href="index.html">Home</a>
-    <a href="sites.html">Sites</a>
-    <a href="maintainers.html">Maintainers</a>
-    <a href="restricted-ports.html">Restricted</a>
-  </div>
-</div>
+    <div class="header">
+        portroach - OpenBSD Ports Distfile Scanner
+        <div class="menu">
+            <a href="index.html">Home</a>
+            <a href="sites.html">Sites</a>
+            <a href="maintainers.html">Maintainers</a>
+            <a href="restricted-ports.html">Restricted</a>
+        </div>
+    </div>
 
-<hr>
+    <hr>
 
-<p class="intro">
-  Generated on %%(date) at %%(time), by <a href="http://jasperla.github.io/portroach/">portroach</a> v%%(appver)
-</p>
-<div ng-cloak>
-  <p class="summary">
-    Summary:<br />
-    Total distfiles: {{ overview.summary.total_ports }}<br />
-    Outdated distfiles: {{ overview.summary.total_outdated }} ({{ overview.summary.outdated_percentage }}%)<br />
-    Maintainers: {{ overview.summary.total_maintainers }}
-  </p>
-</div>
+    <p class="intro">
+        Generated on %%(date) at %%(time), by
+        <a href="http://jasperla.github.io/portroach/">portroach</a> v%%(appver)
+    </p>
 
-<form class="filter-box">
-  <fieldset class="filter-box">
-    Filter Host: <input tabindex="1" ng-model="search.host">
-    Outdated only? <input tabindex="2" type="checkbox" ng-model="overview.onlyOutdated">
-  </fieldset>
-</form>
+    <div>
+        <p class="summary">
+            Summary:<br>
+            Total hosts: %%(total_hosts)<br>
+            Total distfiles: %%(total_ports)<br>
+            Outdated distfiles: %%(total_outdated) (%%(outdated_percentage)%)<br>
+            Maintainers: %%(total_maintainers)
+        </p>
+        <p>
+            Description for the columns:
+        </p>
+        <ul>
+            <li>? = unknow, old version not found.</li>
+            <li>S = number of successes.</li>
+            <li>F = number of failures.</li>
+            <li>L = lie counter.</li>
+        </ul>
+        <p></p>
+    </div>
 
-<table class="results" cellspacing="1" cellpadding="2" >
-	<tbody id="results">
-		<tr class="resultshead">
-			<td><a class="sortable" title="Sort by host" href="" ng-click="predicate = 'host'; reverse=false">Host</a></td>
-			<td><a class="sortable" title="Sort by total distfiles" href="" ng-click="predicate = 'total'; reverse=!reverse">Total distfiles</a></td>
-			<td><a class="sortable" title="Sort by distfiles (absolute)" href="" ng-click="predicate = 'withnewdistfile'; reverse=!reverse">New Distfile(s)</a></td>
-			<td><a class="sortable" title="Sort by distfiles (relative)" href="" ng-click="predicate = 'percentage'; reverse=!reverse">% Out of Date</a></td>
-		</tr>
-		<tr ng-show="loading"><td colspan="4">Loading...</td></tr>
-        <tr ng-cloak class="resultsrow" ng-show="overview.showOutdated(site, overview.onlyOutdated)" ng-repeat="site in overview.results | filter:search | orderBy:predicate:reverse">
-            <td><a href="{{ site.host }}.html">{{ site.host }}</a></td>
-            <td>{{ site.total }}</td>
-            <td>{{ site.withnewdistfile }}</td>
-            <td>{{ site.percentage }}%</td>
-        </tr>
-	</tbody>
-</table>
+    <form class="filter-box ">
+        <fieldset class="filter-box">
+            Filter Host: <input tabindex="1" data-filter="0">
+            Outdated only? <input tabindex="2" type="checkbox" data-filter="3">
+        </fieldset>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th data-sortable="str" class="asc">Host</th>
+                <th data-sortable="str">Type</th>
+                <th data-sortable>Total distfiles</th>
+                <th data-sortable>New Distfile(s)</th>
+                <th data-sortable>% Out of Date</th>
+                <th data-sortable>?</th>
+                <th data-sortable>S</th>
+                <th data-sortable>F</th>
+                <th data-sortable>L</th>
+                <th data-sortable="str">Next Robot check</th>
+            </tr>
+        </thead>
+        <tbody>
+%%:         <tr>
+%%:             <td><a href="%%(link).html">%%(host)</a></td>
+%%:             <td>%%(type)</td>
+%%:             <td>%%(total)</td>
+%%:             <td>%%(withnewdistfile)</td>
+%%:             <td>%%(percentage)%</td>
+%%:             <td>%%(unknow)</td>
+%%:             <td>%%(successes)</td>
+%%:             <td>%%(failures)</td>
+%%:             <td>%%(liecount)</td>
+%%:             <td>%%(robots_nextcheck)</td>
+%%:         </tr>
+        </tbody>
+    </table>
+
     <script type="text/javascript" src="assets/app.js"></script>
+
 </body>
+
 </html>
