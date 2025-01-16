@@ -143,7 +143,7 @@ sub BuildPort
 {
 	my ($ps, $sdbh) = @_;
 	my ($port, $q, $tot, $n, $rej, $meta, $dup, $bump, $up, $new);
-	# XXX $n = $rej = $meta = $dup = $bump = $up = $new = 0;
+	$n = $rej = $meta = $dup = $bump = $up = $new = 0;
 
 	my $sths = {};
 	prepare_sql($sdbh, $sths, qw(
