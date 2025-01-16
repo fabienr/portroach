@@ -88,10 +88,10 @@ sub new
 #                    sufx        - Distfile suffix (e.g. ".tar.gz")
 #                    comment     - Description of port
 #                    options     - Hash of port options, from "PORTROACH" var.
-#                    pcfg_comment  - Explanation for PORTROACH(PORTROACH_COMMENT)
+#                    pcfg_comment- Explanation for PORTROACH(PORTROACH_COMMENT)
 #                    homepage    - Homepage
-#                    basepkgpath - BASE_PKGPATH (calculated with tobasepkgpath) (required)
-#                    fullpkgpath - FULLPKGPATH (required)
+#                    basepkgpath - BASE_PKGPATH from tobasepkgpath() (required)
+#                    fullpkgpath - FULLPKGPATH                       (required)
 #
 # Retn: $success - 4, duplicate, same basepkgpath & distfile (ROACH_URL)
 #                  3, version change
@@ -105,19 +105,18 @@ sub AddPort
 	my ($self) = shift;
 	my ($port) = @_;
 
-	my ($_sites, $oldport, $iss);
+	my ($_sites, $oldport, %pcfg, $newver);
 
 	my $rc = 0; # return error by default
-	my $dbh  = $self->{dbh};
+	my $dbh = $self->{dbh};
 	my $sths = $self->{sths};
 
 	my $nvcleared = 0;
 
 	# Check for required fields. Note ver is handled later on.
 
-	foreach my $key (qw(
-		name cat maintainer distfile sites basepkgpath fullpkgpath
-	)) {
+	foreach my $key (
+	    qw(name cat maintainer distfile sites basepkgpath fullpkgpath)) {
 		if (!exists $port->{$key} || !$port->{$key}) {
 			print STDERR "$port->{fullpkgpath}: missing $key\n";
 			debug(__PACKAGE__, $port, Dumper($port));
@@ -128,8 +127,8 @@ sub AddPort
 	if (ref $port->{sites} ne 'ARRAY') {
 		if ($port->{sites} =~ /\s/) {
 			print STDERR "$port->{fullpkgpath}: "
-				. "wrong format for sites, "
-				. "should be an arrayref or single item.\n";
+			    . "wrong format for sites, "
+			    . "should be an arrayref or single item.\n";
 			debug(__PACKAGE__, $port, Dumper($port));
 			return 0;
 		}
@@ -261,152 +260,141 @@ sub AddPort
 
 	# Portconfig stuff
 
-	# XXX howto set pcfg_static ?
-	#$sths->{portconfig_isstatic}->execute($port->{name}, $port->{cat});
-	#($iss) = $sths->{portconfig_isstatic}->fetchrow_array;
-	#if (!$iss) {
-		my (%pcfg);
+	foreach my $var (keys %{$port->{options}}) {
+		my $val = $port->{options}->{$var};
 
-		foreach my $var (keys %{$port->{options}}) {
-			my $val = $port->{options}->{$var};
-
-			if ($var !~ /^[A-Za-z]+$/i) {
-				print STDERR "$port->{fullpkgpath}: "
-				    . "invalid portconfig tuple ($var)\n";
-				next;
-			}
-
-			if ($var eq 'site') {
-				if ($val =~ /^(?:ftp|https?):\/\/[^\/]+/i) {
-					$pcfg{indexsite} = $val;
-					next;
-				}
-				print STDERR "$port->{fullpkgpath}: "
-				    . "invalid portconfig site ($val)\n";
-				next;
-			}
-
-			if ($var eq 'limit') {
-				# Check regex isn't going to explode
-				eval {
-					no warnings 'all';
-					my $re = '';
-					$re =~ /$val/;
-					1;
-				};
-
-				if ($@) {
-					print STDERR "$port->{fullpkgpath}: "
-					    . "bad portconfig regex ($val)\n";
-					next;
-				};
-
-				$pcfg{limitver} = $val;
-				next;
-			}
-
-			if ($var eq 'ignore') {
-				if ($val == 1 or lc $val eq 'yes') {
-					$pcfg{ignore} = 1;
-				} else {
-					$pcfg{ignore} = 0;
-				}
-				next;
-			}
-
-			if ($var eq 'skipb') {
-				if ($val == 1 or lc $val eq 'yes') {
-					$pcfg{skipbeta} = 1;
-				} else {
-					$pcfg{skipbeta} = 0;
-				}
-				next;
-			}
-
-			if ($var eq 'skipv') {
-				$val =~ s/,+/ /g;
-				$pcfg{skipversions} = $val;
-				next;
-			}
-
-			if ($var eq 'limitw') {
-				$val = lc $val;
-				if ($val =~ /^(\d{1,2}),(even|odd)$/i) {
-					$pcfg{limitwhich} = $1;
-					$pcfg{limiteven}  = $2 eq 'even' ? 1 : 0;
-				} else {
-					print STDERR "$port->{fullpkgpath}: "
-					    . "bad portconfig limitw ($val)\n";
-				}
-				next;
-			}
-
-			# We've checked for all the variables we support
-
+		if ($var !~ /^[A-Za-z]+$/i) {
 			print STDERR "$port->{fullpkgpath}: "
-			    . "unknown portconfig key ($var)\n";
+			    . "invalid portconfig tuple ($var)\n";
+			next;
 		}
 
-		# Nullify any variables we haven't accumulated
-		foreach ('indexsite', 'limitver', 'skipversions', 'limiteven', 'limitwhich') {
-			$pcfg{$_} = undef if (!exists $pcfg{$_});
-		}
-
-		# ...except these, which shouldn't be NULL
-		$pcfg{skipbeta} = 1 if !exists($pcfg{skipbeta});
-		$pcfg{ignore} = 0 if !exists($pcfg{ignore});
-
-		$sths->{portconfig_update}->execute(
-		    $pcfg{indexsite}, $pcfg{limitver}, $pcfg{limiteven},
-		    $pcfg{skipbeta}, $pcfg{skipversions}, $pcfg{limitwhich},
-		    $pcfg{ignore}, $port->{fullpkgpath}
-		) if (!$settings{precious_data});
-
-		# Ensure indexsite is added to sitedata
-		push @{$port->{sites}}, $pcfg{indexsite} if ($pcfg{indexsite});
-
-		my $newver;
-
-		$sths->{portdata_getnewver}->execute($port->{fullpkgpath});
-		($newver) = $sths->{portdata_getnewver}->fetchrow_array;
-
-		# Determine if the portconfig constraints
-		# invalidate the current new version.
-		if ($newver and !$nvcleared) {
-			my $invalid = 0;
-
-			$pcfg{ignore} and $invalid = 1;
-
-			if (defined $pcfg{limiteven} and $pcfg{limitwhich} >= 0) {
-				checkevenodd($newver, $pcfg{limiteven}, $pcfg{limitwhich})
-					or $invalid = 1;
+		if ($var eq 'site') {
+			if ($val =~ /^(?:ftp|https?):\/\/[^\/]+/i) {
+				$pcfg{indexsite} = $val;
+				next;
 			}
+			print STDERR "$port->{fullpkgpath}: "
+			    . "invalid portconfig site ($val)\n";
+			next;
+		}
 
-			if ($pcfg{skipversions}) {
-				my @sv = split /\s+/, $pcfg{skipversions};
-				foreach (@sv) {
-					if ($newver eq $_) {
-						$invalid = 1;
-						last;
-					}
+		if ($var eq 'limit') {
+			# Check regex isn't going to explode
+			eval {
+				no warnings 'all';
+				my $re = '';
+				$re =~ /$val/;
+				1;
+			};
+
+			if ($@) {
+				print STDERR "$port->{fullpkgpath}: "
+				    . "bad portconfig regex ($val)\n";
+				next;
+			};
+
+			$pcfg{limitver} = $val;
+			next;
+		}
+
+		if ($var eq 'ignore') {
+			if ($val == 1 or lc $val eq 'yes') {
+				$pcfg{ignore} = 1;
+			} else {
+				$pcfg{ignore} = 0;
+			}
+			next;
+		}
+
+		if ($var eq 'skipb') {
+			if ($val == 1 or lc $val eq 'yes') {
+				$pcfg{skipbeta} = 1;
+			} else {
+				$pcfg{skipbeta} = 0;
+			}
+			next;
+		}
+
+		if ($var eq 'skipv') {
+			$val =~ s/,+/ /g;
+			$pcfg{skipversions} = $val;
+			next;
+		}
+
+		if ($var eq 'limitw') {
+			$val = lc $val;
+			if ($val =~ /^(\d{1,2}),(even|odd)$/i) {
+				$pcfg{limitwhich} = $1;
+				$pcfg{limiteven}  = $2 eq 'even' ? 1 : 0;
+			} else {
+				print STDERR "$port->{fullpkgpath}: "
+				    . "bad portconfig limitw ($val)\n";
+			}
+			next;
+		}
+
+		# We've checked for all the variables we support
+		print STDERR "$port->{fullpkgpath}: "
+		    . "unknown portconfig key ($var)\n";
+	}
+
+	# Nullify any variables we haven't accumulated
+	foreach (qw(indexsite limitver skipversions limiteven limitwhich)) {
+		$pcfg{$_} = undef if (!exists $pcfg{$_});
+	}
+
+	# ...except these, which shouldn't be NULL
+	$pcfg{skipbeta} = 1 if !exists($pcfg{skipbeta});
+	$pcfg{ignore} = 0 if !exists($pcfg{ignore});
+
+	$sths->{portconfig_update}->execute(
+		$pcfg{indexsite}, $pcfg{limitver}, $pcfg{limiteven},
+		$pcfg{skipbeta}, $pcfg{skipversions}, $pcfg{limitwhich},
+		$pcfg{ignore}, $port->{fullpkgpath}
+	) if (!$settings{precious_data});
+
+	# Ensure indexsite is added to sitedata
+	push @{$port->{sites}}, $pcfg{indexsite} if ($pcfg{indexsite});
+
+	$sths->{portdata_getnewver}->execute($port->{fullpkgpath});
+	($newver) = $sths->{portdata_getnewver}->fetchrow_array;
+
+	# Determine if the portconfig constraints
+	# invalidate the current new version.
+	if ($newver && !$nvcleared) {
+		my $invalid = 0;
+
+		$invalid = 1 if $pcfg{ignore};
+
+		if (defined $pcfg{limiteven} && $pcfg{limitwhich} >= 0 &&
+		    !checkevenodd($newver,$pcfg{limiteven},$pcfg{limitwhich})){
+			$invalid = 1;
+		}
+
+		if ($pcfg{skipversions}) {
+			my @sv = split /\s+/, $pcfg{skipversions};
+			foreach (@sv) {
+				if ($newver eq $_) {
+					$invalid = 1;
+					last;
 				}
 			}
-
-			if ($pcfg{limitver}) {
-				$newver =~ /$pcfg{limitver}/
-					or $invalid = 1;
-			}
-
-			if ($pcfg{skipbeta} && isbeta($port->{ver})) {
-				isbeta($newver)
-					and $invalid = 1;
-			}
-
-			if ($invalid and !$settings{precious_data}) {
-				$sths->{portdata_clearnewver}->execute($port->{fullpkgpath});
-			}
 		}
-	#} XXX howto set pcfg_static ?
+
+		if ($pcfg{limitver} && $newver !~ /$pcfg{limitver}/) {
+			$invalid = 1;
+		}
+
+		if ($pcfg{skipbeta} && isbeta($port->{ver}) && isbeta($newver)){
+			$invalid = 1;
+		}
+
+		if ($invalid && !$settings{precious_data}) {
+			$sths->{portdata_clearnewver}->execute(
+			    $port->{fullpkgpath});
+		}
+	}
 
 	# Sites
 
