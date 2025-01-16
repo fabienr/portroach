@@ -285,7 +285,7 @@ sub ExecArgs
 
 sub Check
 {
-    my $sdbh = shift;
+	my $sdbh = shift;
 	my (%sths, @workblock, $dbh, $nofork, $num_rows, $i);
 
 	$nofork = ($settings{num_children} == 0);
@@ -501,7 +501,7 @@ sub VersionCheck
 		# Look to see if the URL contains the distfile version.
 		# This will affect our checks and guesses later on.
 		if ($port->{ver} =~ /^(?:\d+\.)+\d+$/
-				or $port->{ver} =~ /$date_regex/) {
+		    or $port->{ver} =~ /$date_regex/) {
 			my ($lastdir, $majver);
 
 			$lastdir = uri_lastdir($site);
