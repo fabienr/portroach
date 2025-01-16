@@ -48,6 +48,10 @@ use Portroach::Const;
 use Portroach::Util;
 use Portroach::Config;
 
+use Portroach::SiteHandler::FTP;
+use Portroach::SiteHandler::HTTP;
+use Portroach::SiteHandler::HttpGuess;
+
 use feature qw(switch);
 no if $] >= 5.018, warnings => "experimental::smartmatch";
 
@@ -466,7 +470,7 @@ sub VersionCheck
 	# Loop through master sites
 	foreach my $site (split ' ', $port->{mastersites})
 	{
-		my (@files, @dates, $host, $sitedata, $method, $path_ver,
+		my (@files, @dates, $host, $sitedata, $method, $path_ver, $sh,
 		    $new_found, $old_found, $file);
 
 		$site .= '/' unless $site =~ /\/$/;
@@ -527,8 +531,7 @@ sub VersionCheck
 		}
 
 		# Check for special handler for this site first
-		if (my $sh = Portroach::SiteHandler->FindHandler($site))
-		{
+		if ($sh = Portroach::SiteHandler->FindHandler($site)) {
 			if ( first { $sh->{name} eq $_ } @handlers) {
 				info(1, $k, "Already tried site handler "
 				    . "$sh->{name}, skip $site");
@@ -540,122 +543,31 @@ sub VersionCheck
 			if (!$sh->GetFiles($site, $port, \@files)) {
 				info(1, $k, $host, "$sh->{name} GetFiles() "
 				    . "failed for $site");
+				$sths->{sitedata_failure}->execute($site->host);
+				next;
 			} else {
-				$method = METHOD_HANDLER;
+				$sths->{sitedata_success}->execute($site->host);
+				$method = METHOD_HANDLER if (@files);
 			}
-		}
-		elsif ($site->scheme eq 'ftp')
-		{
-			$method = METHOD_LIST;
 
-			my $ftp = Net::FTP->new(
-				$site->host,
-				Port    => $site->port,
-				Timeout => $settings{ftp_timeout},
-				Debug   => $settings{debug},
-				Passive => $settings{ftp_passive}
-			);
-
-			if (!$ftp) {
-				info(1, $k, $host, "FTP connect problem: ".$@);
-				$sths->{sitedata_failure}->execute($site->host)
-				    unless ($settings{precious_data});
+		# Get files list from FTP
+		} elsif ($site->scheme eq 'ftp') {
+			$sh = Portroach::SiteHandler::FTP->new;
+			if (!$sh->GetFiles($site, $port, \@files, $path_ver)) {
+				info(1, $k, $host, "$sh->{name} GetFiles() "
+				    . "failed for $site");
+				$sths->{sitedata_failure}->execute($site->host);
 				next;
+			} else {
+				$sths->{sitedata_success}->execute($site->host);
+				$method = METHOD_LIST if (@files);
 			}
 
-			my $ftp_failures = 0;
-			while ($ftp_failures <= $settings{ftp_retries}) {
-				if (!$ftp->login('anonymous')) {
-					info(1, $k, $host, 'FTP login error: ' . $ftp->message);
-
-					if ($ftp_failures == 0) {
-						$sths->{sitedata_failure}->execute($site->host)
-							unless ($settings{precious_data});
-					}
-
-					$ftp_failures++;
-
-					if ($ftp->message =~ /\b(?:IP|connections|too many|connected)\b/i) {
-						my $rest = 2+(int rand 15);
-						info(1, $k, $host,
-							"Retrying FTP site in $rest seconds "
-							. "(attempt $ftp_failures of "
-							. "$settings{ftp_retries})"
-						);
-						sleep $rest;
-						next;
-					} else {
-						last;
-					}
-				}
-
-				$ftp_failures = 0;
-				last;
-			}
-			if ($ftp_failures) {
-				info(1, $k, $host, "FTP error: too many failure($ftp_failures)");
-				next;
-			}
-
-			# This acts as an error check, so we'll cwd to our
-			# original directory even if we're not going to look
-			# there.
-			if (!$ftp->cwd($site->path || '/')) {
-				$ftp->quit;
-				info(1, $k, $host, 'FTP cwd error: ' . $ftp->message);
-				$sths->{sitedata_failure}->execute($site->host)
-					unless ($settings{precious_data});
-				next;
-			}
-
-			@files = $ftp->ls;
-
-			if (!@files) {
-				info(1, $k, $host, 'FTP ls error '
-				    . '(or no files found): ' . $ftp->message);
-				$ftp->quit;
-				next;
-			}
-
-			# Did we find a version in site path earlier? If so,
-			# we'll check the parent directory for other version
-			# directories.
-			if ($path_ver) {
-				my ($path);
-				my $site = $site->clone;
-				uri_lastdir($site, undef);
-				$path = $site->path;
-
-				# Parent directory
-				if ($ftp->cwd($site->path)) {
-					foreach my $dir ($ftp->ls) {
-						# Potential sibling version dirs
-						if ($dir =~ /^(?:\d+\.)+\d+$/
-								or $dir =~ /$date_regex/i) {
-							$site->path("$path$dir");
-							if ($ftp->cwd($site->path)) {
-								# Potential version files
-								push @files, "$path$dir/$_"
-									foreach ($ftp->ls);
-							}
-						}
-					}
-				}
-			}
-
-			$ftp->quit;
-
-			if (!@files) {
-				info(1, $k, $host, 'FTP: No files found.');
-				next;
-			}
-		}
-		else
-		{
-			$method = METHOD_LIST;
-
+		# Get files list from HTTP
+		} else {
 			unless (robotsallowed($dbh, $site, $sitedata)) {
-				info(1, $k, $host, 'Ignoring site as per rules in robots.txt.');
+				info(1, $k, $host, 'Ignoring site as per '
+				    . 'rules in robots.txt.');
 
 				# Don't count 'robots' bans as a failure.
 				# (We fetch them from the database so that
@@ -665,208 +577,74 @@ sub VersionCheck
 				next;
 			}
 
+			$sh = Portroach::SiteHandler::HTTP->new;
+			if (!$sh->GetFiles($site, $port, \@files, $path_ver)) {
+				info(1, $k, $host, "$sh->{name} GetFiles() "
+				    . "failed for $site");
+				$sths->{sitedata_failure}->execute($site->host);
+				next;
+			} else {
+				$sths->{sitedata_success}->execute($site->host);
+				$method = METHOD_LIST if (@files);
+			}
+		}
+
+		# No files found - try some guesses ... over http/s only
+		if (!@files && !$port->{indexsite} &&
+		    $site->scheme =~ /^https?/) {
 			my ($ua, $resp);
 
+			# Check distfile still exists
 			$ua = lwp_useragent();
+			$resp = $ua->head($site.$port->{distfiles});
 
-			$resp = $ua->get($site);
+			if (!$resp->is_success || $resp->status_line !~ /^2/) {
+				info(1, $k, $host,
+				    'Not doing any guess, distfile not found.');
+				$sths->{sitedata_failure}->execute($site->host);
+				next;
+			}
 
-			# A 404 here ought to imply that the distfile
-			# is unavailable, since we expect it to be
-			# inside this directory. However, some sites
-			# use scripts or rewrite rules disguised as
-			# directories.
+			# We keep a counter of "lies" from each site, and only
+			# re-check every so often.
+			if ($sitedata->{liecount} > 0) {
+				info(1, $k, $host,
+				    'Not doing any guessing; '
+				    . 'site has previously lied.');
+				$sths->{sitedata_decliecount}->execute(
+				    $sitedata->{host})
+				    unless ($settings{precious_data});
+				next;
+			}
 
-			if ($resp->is_success) {
-				extractfilenames($resp->content, $port->{sufx},
-				    \@files, \@dates);
-				info(1, $port->{fullpkgpath}, $host,
-				    "no link mathing $port->{sufx}")
-				    if (!@files);
+			# Verify site gives an error for bad filenames
+			$resp = $ua->head($site.randstr(8).'_shldntexist.tgz');
+			# Got a response which wasn't HTTP 4xx -> bail out
+			if ($resp->is_success && $resp->status_line !~ /^4/) {
+				info(1, $k, $host,
+				    'Not doing any guessing; '
+				    . 'site is lieing to us.');
+				$sths->{sitedata_initliecount}->execute(
+				    $sitedata->{host})
+				    unless($settings{precious_data});
+				next;
+			}
+
+			# New we are ready to guess ...
+			$sh = Portroach::SiteHandler::HttpGuess->new;
+			if (!$sh->GetFiles($site, $port, \@files, $path_ver)) {
+				info(1, $k, $host, "$sh->{name} GetFiles() "
+				    . "failed for $site");
+				$sths->{sitedata_failure}->execute($site->host);
+				next;
 			} else {
-				info(1, $port->{fullpkgpath}, strchop($site, 60)
-				    . ': ' . $resp->status_line);
+				$sths->{sitedata_success}->execute($site->host);
+				$method = METHOD_GUESS if (@files);
 			}
-
-			if (@files && $path_ver) {
-				# Directory listing a success: we can
-				# investigate $path_ver variations...
-				my $site = $site->clone;
-				my (@dirs, $path);
-
-				# Visit parent directory
-
-				uri_lastdir($site, undef);
-				$path = $site->path;
-
-				$resp = $ua->get($site);
-
-				extractdirectories($resp->content, \@dirs)
-				    if ($resp->is_success);
-				info(1, $port->{fullpkgpath}, strchop($site, 60)
-				    . ': ' . $resp->status_line)
-				    unless ($resp->is_success);
-
-				# Investigate sibling version dirs
-				foreach my $dir (@dirs) {
-					if ($dir =~ /^(?:\d+\.)+\d+$/
-					    or $dir =~ /$date_regex/i) {
-						my @files_tmp;
-
-						$site->path("$path$dir");
-						$resp = $ua->get($site);
-
-						extractfilenames(
-						    $resp->content,
-						    $port->{sufx},
-						    \@files_tmp,
-						    \@dates
-						) if ($resp->is_success);
-						info(1, $port->{fullpkgpath},
-						    strchop($site, 60)
-						    . ': ' . $resp->status_line)
-						    unless ($resp->is_success);
-
-						debug(__PACKAGE__, $port,
-						    "push $path$dir/$_")
-						    foreach (@files_tmp);
-						push @files, "$path$dir/$_"
-						    foreach (@files_tmp);
-					}
-				}
-			} 
-
-			# No files found - try some guesses
-			if (!@files && !$port->{indexsite})
-			{
-				my (%headers, $url);
-				my $bad_mimetypes = 'html|text|css|pdf|jpeg|gif|png|image|mpeg|bitmap';
-
-				$url = $site;
-				$url .= '/' unless $url =~ /\/$/;
-
-				# Check distfile still exists
-				# XXX s/distfiles/distfile/
-				$resp = $ua->head($url.$port->{distfiles});
-				%headers  = %{$resp->headers};
-
-				unless ($resp->is_success && $resp->status_line =~ /^2/ &&
-					$headers{'content-type'} !~ /($bad_mimetypes)/i) {
-					info(1, $k, $host, 'Not doing any guess, distfile not found.');
-					next;
-				}
-
-				# We keep a counter of "lies" from each site, and only
-				# re-check every so often.
-				if ($sitedata->{liecount} > 0) {
-					info(1, $k, $host, 'Not doing any guessing; site has previously lied.');
-					$sths->{sitedata_decliecount}->execute($sitedata->{host})
-						unless($settings{precious_data});
-					next;
-				}
-
-				# Verify site gives an error for bad filenames
-
-				$resp = $ua->head($url.randstr(8).'_shouldntexist.tar.gz');
-				%headers  = %{$resp->headers};
-
-				# Got a response which wasn't HTTP 4xx -> bail out
-				if ($resp->is_success && $resp->status_line !~ /^4/) {
-					info(1, $k, $host, 'Not doing any guessing; site is lieing to us.');
-					$sths->{sitedata_initliecount}->execute($sitedata->{host})
-						unless($settings{precious_data});
-					next;
-				}
-
-				# XXX $port->{newver} ? $port->{newver} : $port->{ver}
-				foreach (verguess($port->{ver}, $port->{limitwhich})) {
-					my $guess_v = $_;
-					my $old_v   = quotemeta $port->{ver};
-					my $s       = quotemeta $port->{sufx};
-
-					# Only change major version if port isn't
-					# version-specific
-
-					if ($port->{limitver}) {
-						next unless ($guess_v =~ /$port->{limitver}/);
-					} elsif ($port->{name} =~ /^(.*\D)(\d{1,3})(?:[-_]\D+)?$/) {
-						my $nm_nums = $2;
-						my $vr_nums = $guess_v;
-						my $vo_nums = $old_v;
-
-						unless (($1.$2) =~ /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/i) {
-							my $fullver = "";
-							while ($vo_nums =~ s/^(\d+?)[-_\.]?//) {
-								$fullver .= $1;
-								last if ($fullver eq $nm_nums);
-							}
-
-							if ($fullver eq $nm_nums) {
-								$vr_nums =~ s/[-_\.]//g;
-								next unless ($vr_nums =~ /^$nm_nums/);
-							}
-						}
-					}
-
-					if ($port->{skipversions}) {
-						my @skipvers = split /\s+/, $port->{skipversions};
-						arrexists(\@skipvers, $guess_v)
-							and next;
-					}
-
-					info(1, $k, $host, "Guessing version $port->{ver} -> $guess_v");
-
-					my $distfile = $port->{distfiles};
-					my $site = $site->clone;
-
-					next unless ($distfile =~ s/$old_v/$guess_v/gi);
-
-					if ($path_ver) {
-						my ($path);
-						uri_lastdir($site, undef);
-						$path = $site->path;
-						if ($path_ver ne $port->{ver}) {
-							# Major ver in site path
-							my $guess_maj = $guess_v;
-							$guess_maj =~ s/\.\d+$//;
-							$site->path("$path$guess_maj/");
-						} else {
-							# Full ver in site path
-							$site->path("$path$guess_v/");
-						}
-					}
-
-					$resp = $ua->head($url.$distfile);
-					%headers  = %{$resp->headers};
-
-					if ($resp->is_success && $resp->status_line =~ /^2/ &&
-						$headers{'content-type'} !~ /($bad_mimetypes)/i) {
-						info(0, $k, $host, "UPDATE $port->{ver} -> $guess_v");
-
-						$sths->{portdata_setnewver}->execute(
-							$guess_v, METHOD_GUESS, $url.$distfile,
-							$port->{id}
-						) unless ($settings{precious_data});
-
-						$new_found = 1;
-						$found = 2 if ($new_found);
-						last;
-					} else {
-						info(1, $k, $host, "Guess failed $port->{ver} -> $guess_v");
-					}
-
-					last if ($new_found);
-				}
-			}
-
-			last if ($new_found);
 		}
 
 		debug(__PACKAGE__, $port, "Files from $site:");
 		debug(__PACKAGE__, $port, " -> $_") foreach @files;
-
-		# Make note of working site
-		$sths->{sitedata_success}->execute($site->host);
 
 		next if (!@files);
 
