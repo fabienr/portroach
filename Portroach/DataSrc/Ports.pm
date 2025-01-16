@@ -298,7 +298,7 @@ sub BuildPort
 		    unless ($sufx = extractsuffix($distfile));
 
 		foreach my $site (split /\s+/, $port->{master_sites}) {
-			my $ignored = 0;
+			my ($canon, $abs_path);
 
 			# XXX site group spec. ?
 			$site =~ s/:[A-Za-z0-9][A-Za-z0-9\,]*$//g;
@@ -309,48 +309,61 @@ sub BuildPort
 				    . "no master sites\n";
 				next;
 			}
+			
+			# path detected in distfile, move it into SITES
+			unless ($site =~ /\/$/) {
+				print STDERR "$port->{fullpkgpath}: "
+				    . "FIX, missing last / in $site\n";
+				$site .= '/';
+			}
+			$site .= $path if ($path);
+
 			try {
-				# path detected in distfile, move it into SITES
-				unless ($site =~ /\/$/) {
-					print STDERR "$port->{fullpkgpath}: "
-					    . "FIX, missing last / in $site\n";
-					$site .= '/';
-				}
-				$site .= $path if ($path);
-
-				# cleanup site and print to STDERR
-				my $canonical = URI->new($site)->canonical;
-				if (length $canonical->host == 0) {
-					print STDERR "$port->{fullpkgpath}: "
-					    . "empty host $canonical\n";
-					next;
-				}
-				$canonical =~ s/(?<!\:)\/+/\//g;
-				if ($canonical ne $site) {
-					# XXX too verbose ... cosmetic ?
-					#print STDERR "$port->{fullpkgpath}: "
-					#   . "FIX, site $site -> $canonical\n";
-					info(1, $port->{fullpkgpath},
-					    "FIX, site $site -> $canonical");
-					$site = $canonical;
-				}
-
-				# mastersite to ignore ?
-				my $site_re = Portroach::Util::restrict2regex(
-				    $settings{mastersite_ignore});
-				if ($site_re && $site =~ /$site_re/) {
-					debug(__PACKAGE__, $port, "mastersite "
-					    . "ignore $site =~ $site_re");
-					next;
-				}
-
-				push(@sites, $site);
-
+				# canonical site and print to STDERR
+				$canon = URI->new($site)->canonical;
 			} catch {
 				print STDERR "$port->{fullpkgpath}: "
 				    . "caught error on $site\n";
 				debug(__PACKAGE__, $port, "$_");
+				next;
+			};
+
+			if (length $canon->host == 0) {
+				print STDERR "$port->{fullpkgpath}: "
+				    . "empty host $canon\n";
+				next;
 			}
+
+			# check if path is absolute in the port
+			# XXX verbose, looks cosmetic
+			$abs_path = $canon->path;
+			while ($abs_path =~ s:
+			    /+(?=/)
+			    | ^/\.\.(?=/)
+			    | (?<=/)(?!\.\./)[^/]+/\.\./
+			    | (?<![^/])\./
+			    ::x) {};
+			if ($canon->path ne $abs_path) {
+				info(1, $port->{fullpkgpath},
+				    "FIX, path $canon -> $abs_path");
+				$canon->path($abs_path);
+			# check if site is cannonical in the port
+			} elsif ($canon ne $site) {
+				info(1, $port->{fullpkgpath},
+				    "FIX, site $site -> $canon");
+			}
+			$site = $canon;
+
+			# mastersite to ignore ?
+			my $site_re = Portroach::Util::restrict2regex(
+			    $settings{mastersite_ignore});
+			if ($site_re && $site =~ /$site_re/) {
+				debug(__PACKAGE__, $port, "mastersite "
+				    . "ignore $site =~ $site_re");
+				next;
+			}
+
+			push(@sites, $site);
 		}
 
 		debug(__PACKAGE__, $port, "pkg $port->{pkgname}: "
