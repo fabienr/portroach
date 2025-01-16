@@ -290,7 +290,7 @@ sub BuildPort
 				$pcfg{lc $1} = $2;
 			} else {
 				print STDERR "$port->{fullpkgpath}: "
-				    . "invalid portroach '$cfg'\n";
+				    . "invalid portroach config '$cfg'\n";
 			}
 		}
 
@@ -348,9 +348,9 @@ sub BuildPort
 
 			} catch {
 				print STDERR "$port->{fullpkgpath}: "
-				    . "caught error on $site:\n";
-				print STDERR "$port->{fullpkgpath}: $_";
-			};
+				    . "caught error on $site\n";
+				debug(__PACKAGE__, $port, "$_");
+			}
 		}
 
 		debug(__PACKAGE__, $port, "pkg $port->{pkgname}: "
