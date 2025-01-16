@@ -920,9 +920,13 @@ sub fullpkgpathtoport
 
 sub primarycategory
 {
-    my $categories = shift;
-    my @category = split(/ /, $categories);
-    return @category[0];
+	my ($categories, $path) = @_;
+	my $main_cat;
+	foreach my $category (split(/ /, $categories)) {
+		$main_cat = $category if ($path =~ /^\Q$category\E/ && (
+		    !$main_cat || length $main_cat < length $category));
+	}
+	return $main_cat;
 }
 
 #------------------------------------------------------------------------------

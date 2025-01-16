@@ -212,7 +212,13 @@ sub BuildPort
 		$n++;
 
 		$basepkgpath = tobasepkgpath($port->{fullpkgpath});
-		$category    = primarycategory($port->{categories});
+		$category = primarycategory($port->{categories}, $basepkgpath);
+
+		unless ($category) {
+			print STDERR "$port->{fullpkgpath}: no cat matching, "
+			    . "$port->{categories} !~ $basepkgpath\n";
+			$category = (split(/ /, $port->{categories}))[0];
+		}
 
 		if ($category eq 'meta') {
 			info(1, $port->{fullpkgpath},
