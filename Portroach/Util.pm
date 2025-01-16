@@ -52,6 +52,7 @@ our @EXPORT = qw(
 	&isversion
 	&isbeta
 	&chopbeta
+	&nametoregex
 	&verguess
 	&vercompare
 	&betacompare
@@ -278,6 +279,33 @@ sub chopbeta
 		$$version =~ s/^(.*)[-_.](?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi
 			or $$version =~ s/^(.*)(?<=\d)(?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi
 	);
+}
+
+
+#------------------------------------------------------------------------------
+# Func: nametoregex()
+# Desc: Transform distfile/distname into a regex to matches. Handle optional
+#       lang prefix (ex: py could be py- py_ or none). Do lazy matching against
+#       common separator - _ . to matches any char or none. Escape regex special
+#       chars like + ? { } ( ) and make them optional.
+#
+# Args: $name  - Name string to transform into a regex
+#
+# Retn: $regex - A regular expression to match another name against
+#------------------------------------------------------------------------------
+
+sub nametoregex
+{
+	my $name = shift;
+	my $lang_re = '(node|p5|mod|py|ruby|hs)';
+	my $regex = lc $name;
+
+	$regex =~ s/[\+\?\{\}]/\\$1?/g;
+	$regex =~ s/[\-\_\.]/\.?/g;
+	$regex =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/
+	    if ($regex =~ /^$lang_re.+/);
+
+	return $regex;
 }
 
 

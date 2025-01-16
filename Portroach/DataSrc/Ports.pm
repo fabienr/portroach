@@ -356,30 +356,13 @@ sub BuildPort
 		debug(__PACKAGE__, $port, "pkg $port->{pkgname}: "
 		    . "distfile $distfile, distname $distname");
 
-		my $lang_re = '(node|p5|mod|py|ruby|hs)';
-		$basename_q = lc $basename;
-		debug(__PACKAGE__, $port, "basename optional [-_.] "
-		    . "$basename -> $basename_q")
-		    if ($basename_q =~ s/[\-\_\.]/\.?/g);
-		debug(__PACKAGE__, $port, "basename optional + "
-		    . "$basename -> $basename_q")
-		    if ($basename_q =~ s/\+/\\\+?/g);
-		debug(__PACKAGE__, $port, "basename optional lang "
-		    . "$basename -> $basename_q")
-		    if ($basename_q =~ /^$lang_re.+/ &&
-		        $basename_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
+		$basename_q = nametoregex($basename);
+		debug(__PACKAGE__, $port, "basename regex query, "
+		    . "$basename -> $basename_q");
 		if ($basename ne $pathname) {
-			$pathname_q = lc $pathname;
-			debug(__PACKAGE__, $port, "pathname optional [-_.] "
-			    . "$pathname -> $pathname_q")
-			    if ($pathname_q =~ s/[\-\_\.]/\.?/g);
-			debug(__PACKAGE__, $port, "pathname optional + "
-			    . "$pathname -> $pathname_q")
-			    if ($pathname_q =~ s/\+/\\\+?/g);
-			debug(__PACKAGE__, $port, "pathname optional lang "
-			    . "$pathname -> $pathname_q")
-			    if ($pathname_q =~ /^$lang_re.+/ &&
-			$pathname_q =~ s/^$lang_re\\?[\-\_]?/($1)?\[\\-\\_\]?/);
+			$pathname_q = nametoregex($pathname);
+			debug(__PACKAGE__, $port, "pathname regex query, "
+			    . "$pathname -> $pathname_q");
 		}
 
 		foreach my $verdist ($distfile, $distname) {
@@ -413,24 +396,24 @@ sub BuildPort
 			foreach my $q (@name_q) {
 				# Remove prefix / suffix
 				debug(__PACKAGE__, $port, ".*$q\[-_.] -> $ver")
-				    if ($ver =~ s/^.*($q[-_\.])//);
+				    if ($ver =~ s/^.*($q[-_\.])//i);
 				debug(__PACKAGE__, $port, "[-_.]$q.* -> $ver")
-				    if ($ver =~ s/([-_\.]$q).*$//);
+				    if ($ver =~ s/([-_\.]$q).*$//i);
 
 				# Try harder, remove prefix with no separator
 				# XXX could be shorter
 				debug(__PACKAGE__, $port,
 				    ".*$q \\d.\\d... -> $ver")
 				    if ($ver =~
-				        s/^.*($q)(\d+\.\d+[\w\d\.]*)$/$2/);
+				        s/^.*($q)(\d+\.\d+[\w\d\.]*)$/$2/i);
 				debug(__PACKAGE__, $port,
 				    ".*$q \\d_\\d... -> $ver")
 				    if ($ver =~
-				        s/^.*($q)(\d+\_\d+[\w\d\_]*)$/$2/);
+				        s/^.*($q)(\d+\_\d+[\w\d\_]*)$/$2/i);
 				debug(__PACKAGE__, $port,
 				    ".*$q \\d-\\d... -> $ver")
 				    if ($ver =~
-				        s/^.*($q)(\d+\-\d+[\w\d\-]*)$/$2/);
+				        s/^.*($q)(\d+\-\d+[\w\d\-]*)$/$2/i);
 			}
 
 			# Remove common suffix

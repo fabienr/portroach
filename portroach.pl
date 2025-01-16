@@ -984,14 +984,12 @@ sub FindNewestFile
 	my $distfile = $port->{distfiles};
 	my $distfile_q = $distfile;
 	my $old_v = $port->{ver};
-	if ($distfile_q =~ s/^(.*)(?:$verprfx_regex?)*\Q$old_v\E(.*)$/$1##V##$2/i) {
-		debug(__PACKAGE__, $port, "optional [-_.] "
-		    . "$distfile -> $distfile_q")
-		    if ($distfile_q =~ s/[\-\_\.]/\.?/g);
-		debug(__PACKAGE__, $port, "optional + "
-		    . "$distfile -> $distfile_q")
-		    if ($distfile_q =~ s/\+/\\\+?/g);
+	if ($distfile_q =~
+	    s/^(.*)(?:$verprfx_regex?)*\Q$old_v\E(.*)$/$1##V##$2/i) {
+		$distfile_q = nametoregex($distfile_q);
 		$distfile_q =~ s/##V##/(?:$verprfx_regex)?(\\d.*?)/;
+		debug(__PACKAGE__, $port, "distfile regex query, "
+		    . "$distfile -> $distfile_q");
 	} else {
 		debug(__PACKAGE__, $port, "invalid distfile $distfile, "
 		    . "version ($verprfx_regex)?$old_v not found.");
