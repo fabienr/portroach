@@ -473,7 +473,11 @@ sub VersionCheck
 	$i = 0;
 
 	# Override MASTER_SITES if requested
-	$port->{mastersites} = $port->{indexsite} if ($port->{indexsite});
+	if ($port->{indexsite}) {
+		info(1, $k,"Using indexsite instead of mastersite ".
+		    "$port->{mastersites} -> $port->{indexsite}");
+		$port->{mastersites} = $port->{indexsite};
+	}
 
 	# XXX s/distfiles/distfile/
 	return if (!$port->{distfiles} || !$port->{mastersites});
