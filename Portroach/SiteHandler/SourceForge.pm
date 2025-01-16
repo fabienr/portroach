@@ -80,7 +80,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /^https?:\/\/downloads\.sourceforge\.net/);
+	return ($url =~ /^https?:\/\/.*\.sourceforge\.net/);
 }
 
 
@@ -103,53 +103,55 @@ sub GetFiles
 
 	my ($url, $port, $files) = @_;
 
-	my $q = 'downloads\.sourceforge\.net\/sourceforge\/';
-	if ($url =~ /$q(project\/?)?([^\/]*)\//) {
-		my ($query, $projname, $ua, $resp, $xpath, $items);
+	my ($query, $projname, $ua, $resp, $xpath, $items);
 
+	my $q = 'downloads\.sourceforge\.net\/(sourceforge|project)\/';
+	if ($url =~ /$q([^\/]*)\//) {
 		$projname = $2;
-
-		# Find the RSS feed for this project.
-		$query = 'http://sourceforge.net/projects/'
-		    . $projname . '/rss';
-
-		debug(__PACKAGE__, $port, "GET $query");
-		$ua = lwp_useragent();
-		$resp = $ua->get($query);
-
-		if (!$resp->is_success || $resp->status_line !~ /^2/) {
-			info(1, $port->{fullpkgpath}, strchop($query, 60)
-			    . ': ' . $resp->status_line);
-			return 0;
-		}
-
-		my $feed = XML::Feed->parse(\$resp->content);
-		unless ($feed) {
-			print STDERR "$port->{fullpkgpath}: $query, "
-			    . "invalid feed, " . XML::Feed->errstr . "\n";
-			return 0;
-		}
-		unless ($feed->entries) {
-			print STDERR "$port->{fullpkgpath}: $query, "
-			    . "invalid feed, no entries\n";
-			return 0;
-		}
-
-		foreach my $item ($feed->entries) {
-			my ($file, $url);
-
-			$file = "/project/$projname" . $item->title;
-			$url = $item->link;
-
-			next if ($url =~ /\/$/);
-
-			# Note this file.
-			push @$files, $file;
-		}
+	} elsif ($url =~ /^https?:\/\/(.*)\.sourceforge\.net\//) {
+		$projname = $1;
 	} else {
 		print STDERR "$port->{fullpkgpath}: $url, "
 		    . "no projname found in url\n";
 		return 0;
+	}
+
+	# Find the RSS feed for this project.
+	$query = 'http://sourceforge.net/projects/'
+		. $projname . '/rss';
+
+	debug(__PACKAGE__, $port, "GET $query");
+	$ua = lwp_useragent();
+	$resp = $ua->get($query);
+
+	if (!$resp->is_success || $resp->status_line !~ /^2/) {
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+			. ': ' . $resp->status_line);
+		return 0;
+	}
+
+	my $feed = XML::Feed->parse(\$resp->content);
+	unless ($feed) {
+		print STDERR "$port->{fullpkgpath}: $query, "
+			. "invalid feed, " . XML::Feed->errstr . "\n";
+		return 0;
+	}
+	unless ($feed->entries) {
+		print STDERR "$port->{fullpkgpath}: $query, "
+			. "invalid feed, no entries\n";
+		return 0;
+	}
+
+	foreach my $item ($feed->entries) {
+		my ($file, $url);
+
+		$file = "/project/$projname" . $item->title;
+		$url = $item->link;
+
+		next if ($url =~ /\/$/);
+
+		# Note this file.
+		push @$files, $file;
 	}
 
 	return 1;
