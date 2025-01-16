@@ -39,6 +39,7 @@ use MIME::Lite;
 use Net::FTP;
 use URI;
 use JSON qw(decode_json);
+use List::Util qw(first);
 
 use DBI;
 
@@ -448,7 +449,7 @@ sub VersionCheck
 {
 	my ($dbh, $sths, $port) = @_;
 
-	my ($found, $k, $i);
+	my ($found, $k, $i, @handlers);
 
 	$found = 0;
 	$k = $port->{fullpkgpath};
@@ -528,10 +529,16 @@ sub VersionCheck
 		# Check for special handler for this site first
 		if (my $sh = Portroach::SiteHandler->FindHandler($site))
 		{
-			info(1, $k, $host, 'Using dedicated site handler.');
+			if ( first { $sh->{name} eq $_ } @handlers) {
+				info(1, $k, "Already tried site handler "
+				    . "$sh->{name}, skip $site");
+				next;
+			}
+			push(@handlers, $sh->{name});
+			info(1, $k, $host, "Using site handler $sh->{name}.");
 
 			if (!$sh->GetFiles($site, $port, \@files)) {
-				info(1, $k, $host, 'SiteHandler::GetFiles() '
+				info(1, $k, $host, "$sh->{name} GetFiles() "
 				    . "failed for $site");
 			} else {
 				$method = METHOD_HANDLER;

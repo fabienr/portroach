@@ -88,8 +88,8 @@ sub FindHandler
 
 	my ($url) = @_;
 
-	foreach (@sitehandlers) {
-		return new $_ if $_->CanHandle($url);
+	foreach my $class (@sitehandlers) {
+		return $class->new if $class->CanHandle($url);
 	}
 
 	return undef;
