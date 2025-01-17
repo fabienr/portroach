@@ -73,6 +73,7 @@ $$sql{portdata_genmaintainers} =
 	         COUNT(newver != ver) AS withnewdistfile
 	    FROM portdata
 	GROUP BY lower(maintainer)
+	ORDER BY withnewdistfile DESC
 	)
 	      AS pd1
 	);
@@ -97,6 +98,7 @@ $$sql{portdata_gencategories} =
 	         COUNT(CASE WHEN ignore=True THEN 1 END) AS ignored
 	    FROM portdata
 	GROUP BY cat
+	ORDER BY cat
 	)
 	      AS pd1
 	);
@@ -123,8 +125,9 @@ $$sql{portdata_gensites} =
 	         SUM(sitedata.liecount) AS liecount,
 	         MIN(sitedata.robots_nextcheck) AS robots_nextcheck
 	    FROM portdata
-	    INNER JOIN sitedata ON mastersites ILIKE '%' || sitedata.host || '%'
-	    GROUP BY sitedata.host, sitedata.type
+      INNER JOIN sitedata ON mastersites ILIKE '%' || sitedata.host || '%'
+	GROUP BY sitedata.host, sitedata.type
+	ORDER BY unknow DESC
 	)
 	      AS pd1
 	);
