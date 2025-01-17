@@ -118,7 +118,7 @@ sub GetFiles
 
 	# Find the RSS feed for this project.
 	$query = 'http://sourceforge.net/projects/'
-		. $projname . '/rss';
+		. $projname . '/rss?limit=1000';
 
 	debug(__PACKAGE__, $port, "GET $query");
 	$ua = lwp_useragent();
