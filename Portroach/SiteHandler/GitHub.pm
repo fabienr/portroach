@@ -195,6 +195,7 @@ sub GetFiles
 	# For example: 'heimdal-7.3.0' is the full tagname. Therefore remove the
 	# repository name from the filename just in case.
 	my ($account, $repo) = split('/', $projname);
+	$url = "https://github.com/$projname/archive/refs/tags/";
 
 	foreach my $tag (@tags) {
 		my $ver = lc $tag;
@@ -211,11 +212,12 @@ sub GetFiles
 		debug(__PACKAGE__, $port, "stop loading tag, old found $ver")
 		    if ($ver eq $port->{ver});
 
-		$ver = '%%' . $ver;
+		$ver = "$url$tag$port->{sufx}%%$ver";
 		push(@$files, $ver);
 
 		# XXX tmp fix, need graphql to order tag correclty
-		last if ($ver eq '%%'.$port->{ver});
+		$tag = quotemeta $port->{ver};
+		last if ($ver =~ /$tag/i);
 	}
 
 	return 1;
