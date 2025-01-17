@@ -660,35 +660,23 @@ sub checkevenodd
 # Args: $data    - Data from master site request.
 #       $sufx    - Distfile suffix (e.g. ".tar.gz")
 #       \$files  - Where to put filenames found.
-#       \$dates  - Where to put dates found.
 #
 # Retn: $success - true/false
 #------------------------------------------------------------------------------
 
 sub extractfilenames
 {
-	my ($data, $sufx, $files, $dates) = @_;
-
-	my $got_index = 0;
+	my ($data, $sufx, $files) = @_;
 
 	$sufx = quotemeta $sufx;
 
-	my $date_regex =
-		'(?<!\d)(\d{2}(?:\d{2})?([\-\. ]?)(\d{2}|'
-		. $month_regex . ')\4\d{2}(?:\d{2})?)(?!\d)'
-		. '(?:\s*(?:(\d{2}):(\d{2}))?)?';
-
-	# XXX: Work-in-Progress
-	# XXX: @dates will contain garbage
-
-	foreach (split "\n", $data) {
-		while (/<a href=(['"])([^<>]*?$sufx)\1.*?<\/a>/gi) {
+	foreach (split "<", $data) {
+		while (/^a\s+href\s*=\s*(['"])([^<>\s]*$sufx?)\1/gi) {
 			my $file = uri_unescape($2);
-			debug(__PACKAGE__, undef, "") if ($file ne $2);
+			debug(__PACKAGE__, undef, "unescape $2 -> $file")
+			    if ($file ne $2);
 			push @$files, $file;
 		}
-
-		$got_index = /<title>\s*index of.*?<\/title>/i if (!$got_index);
 	}
 
 	return 1;
