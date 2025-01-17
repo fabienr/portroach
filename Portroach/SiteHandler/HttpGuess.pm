@@ -127,39 +127,39 @@ sub GetFiles
 		info(1, $port->{fullpkgpath}, $url->host,
 		    "Guessing version $port->{ver} -> $guess_v");
 
-		my $url = $url->clone;
+		my $site = $url->clone;
 		$distfile = $port->{distfiles};
 		next unless ($distfile =~ s/$old_v/$guess_v/gi);
 
 		if ($path_ver) {
 			my ($path);
-			uri_lastdir($url, undef);
-			$path = $url->path;
+			uri_lastdir($site, undef);
+			$path = $site->path;
 			if ($path_ver ne $port->{ver}) {
 				# Major ver in site path
 				my $guess_maj = $guess_v;
 				$guess_maj =~ s/\.\d+$//;
-				$url->path("$path$guess_maj/");
+				$site->path("$path$guess_maj/");
 			} else {
 				# Full ver in site path
-				$url->path("$path$guess_v/");
+				$site->path("$path$guess_v/");
 			}
 		}
 
-		$resp = $ua->head($url.$distfile);
+		$resp = $ua->head($site.$distfile);
 		%headers  = %{$resp->headers};
 
 		if ($resp->is_success && $resp->status_line =~ /^2/ &&
 		    $headers{'content-type'} !~ /($bad_mimetypes)/i) {
-			debug(__PACKAGE__, $port, "push $url$distfile");
-			push @$files, "$url$distfile";
+			debug(__PACKAGE__, $port, "push $site$distfile");
+			push @$files, "$site$distfile";
 			last;
 		} elsif (!$resp->is_success) {
 			info(1, $port->{fullpkgpath},
-			    strchop($url.$distfile, 60)
+			    strchop($site.$distfile, 60)
 			    . ': ' . $resp->status_line);
 		} else {
-			info(1, $port->{fullpkgpath}, $url->host,
+			info(1, $port->{fullpkgpath}, $site->host,
 			    "Guess failed $port->{ver} -> $guess_v");
 		}
 	}
