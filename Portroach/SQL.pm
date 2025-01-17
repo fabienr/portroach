@@ -178,7 +178,7 @@ $sql{portdata_select} =
 	                        LIMIT 1)
 	           OR systemid is NULL )
 	     AND ignore != true
-	ORDER BY random());
+	ORDER BY fullpkgpath);
 
 $sql{portdata_count} = $sql{portdata_select};
 $sql{portdata_count} =~ s/^SELECT \*/SELECT COUNT(*)/i;
