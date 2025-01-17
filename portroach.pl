@@ -801,7 +801,8 @@ sub FindNewestFile
 
 	foreach my $file (@$files)
 	{
-		my ($new_v, $poss_path, $vercheck);
+		my ($old_v, $new_v, $poss_path);
+		$old_v = $port->{ver};
 
 		if ($file =~ /^(.*)\/(.*?)$/) {
 			# Files from SiteHandlers can come with paths
@@ -835,11 +836,11 @@ sub FindNewestFile
 		next if ($skip);
 
 		# Version already know from <url>%%<ver> string
-		# XXX <url> not yet implemented
-		if ($file =~ s/^%%//) {
-			$vercheck = 1;
-			debug(__PACKAGE__, $port, "new version ? $file");
+		if ($file =~ /%%/) {
 			$new_v = lc $file;
+			$new_v =~ s/^.*%%//;
+			$file =~ s/%%.*$//;
+			debug(__PACKAGE__, $port, "new version ? $new_v");
 
 			if ($new_v eq $port->{ver}) {
 				debug(__PACKAGE__, $port, "old found: "
@@ -978,13 +979,12 @@ sub FindNewestFile
 					$poss_url->path($poss_path)
 					    if ($poss_path);
 				}
-				if ($vercheck) {
-					# XXX stupid but works
-					$poss_url = "";
-				} else {
+				if ($file) {
 					$poss_url->path($poss_url->path . '/')
 					    if ($poss_url !~ /\/$/);
 					uri_filename($poss_url, $file);
+				} else {
+					$poss_url = "";
 				}
 				debug(__PACKAGE__, $port, "last found "
 				    . "poss $poss_match '$poss_url'");
