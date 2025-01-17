@@ -94,7 +94,12 @@ sub GetFiles
 	$resp = $ua->get($url);
 
 	if ($resp->is_success) {
-		extractfilenames($resp->content, $port->{sufx}, \@$files);
+		my @tmp;
+		extractfilenames($resp->content, $port->{sufx}, \@tmp);
+		foreach (@tmp) {
+			debug(__PACKAGE__, $port, "push $_");
+			push @$files, $_;
+		}
 		info(1, $port->{fullpkgpath}, $url->host,
 		    "no link mathing $port->{sufx}")
 		    if (!@$files);
@@ -111,16 +116,17 @@ sub GetFiles
 
 	# Visit parent directory
 
-	uri_lastdir($url, undef);
-	$path = $url->path;
+	my $site = $url->clone;
+	uri_lastdir($site, undef);
+	$path = $site->path;
 
-	$resp = $ua->get($url);
+	$resp = $ua->get($site);
 
 	if ($resp->is_success) {
 		extractdirectories($resp->content, \@dirs);
 	} else {
 		# As we previously got an answer, this is not a failure
-		info(1, $port->{fullpkgpath}, strchop($url, 60)
+		info(1, $port->{fullpkgpath}, strchop($site, 60)
 		    . ': ' . $resp->status_line);
 		# XXX maybe return code depends on !@$files ?
 		return 1; # success
@@ -128,14 +134,15 @@ sub GetFiles
 
 	# Investigate sibling version dirs
 	foreach $dir (@dirs) {
+		my @tmp;
 		next unless ($dir =~ /^(?:\d+\.)+\d+$/ ||
 		    $dir =~ /$date_regex/i);
 
-		$url->path("$path$dir");
-		$resp = $ua->get($url);
+		$site->path("$path$dir");
+		$resp = $ua->get($site);
 		if (!$resp->is_success) {
 			# As we previously got an answer, this is not a failure
-			info(1, $port->{fullpkgpath}, strchop($url, 60)
+			info(1, $port->{fullpkgpath}, strchop($site, 60)
 			    . ': ' . $resp->status_line);
 			next;
 		}
