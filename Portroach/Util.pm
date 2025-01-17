@@ -300,7 +300,7 @@ sub nametoregex
 	my $lang_re = '(node|p5|mod|py|ruby|hs)';
 	my $regex = lc $name;
 
-	$regex =~ s/[\+\?\{\}]/\\$1?/g;
+	$regex =~ s/([\+\?\{\}])/\\$1?/g;
 	$regex =~ s/[\-\_\.]/\.?/g;
 	$regex =~ s/^$lang_re\\?[\-\_]?/(?:$1)?\[\\-\\_\]?/
 	    if ($regex =~ /^$lang_re.+/);
