@@ -44,7 +44,8 @@ filters.forEach((f) => {
             ([colIndex, filterValue]) => {
                 const cellValue = row.cells[colIndex].textContent.trim();
                 if (typeof filterValue === "boolean") {
-                    return filterValue && parseFloat(cellValue) === 0;
+                    return filterValue && (
+                        cellValue == "" || parseFloat(cellValue) === 0);
                 }
                 return !cellValue.includes(filterValue);
             });
