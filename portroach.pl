@@ -1216,6 +1216,12 @@ sub GenerateHTMLPorts
 			} else {
 				$row->{head} = $row->{basepkgpath};
 			}
+			if ($row->{newurl}) {
+				$row->{new} = "<a href=\"$row->{newurl}\">"
+				    . "$row->{newver}</a>";
+			} else {
+				$row->{new} = $row->{newver};
+			}
 
 			$template->pushrow($row);
 			push(@results, $row);
