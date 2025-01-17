@@ -220,7 +220,7 @@ sub isversion
 		return 0;
 	}
 
-	# Valid version are date, single number or two digits schema
+	# Valid version are two digits schema, date, or single digit one letter
 	if ($vera =~ /^\d+[\.\-\_]\d+/) {
 		return 1 unless ($verb);
 		return 1 if ($verb =~ /^\d+[\.\-\_]\d+/);
@@ -229,7 +229,7 @@ sub isversion
 		return 1 unless ($verb);
 		return 1 if ($verb =~ /^$date_regex$/);
 		return 0;
-	} elsif ($vera =~ /^\d+$/) {
+	} elsif ($vera =~ /^\d+\D?$/) {
 		return 1 unless ($verb);
 		return 1 if ($verb =~ /^\d+$/);
 		return 0;
