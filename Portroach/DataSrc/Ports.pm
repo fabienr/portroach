@@ -320,18 +320,21 @@ sub BuildPort
 			$site .= $path if ($path);
 
 			try {
-				# canonical site and print to STDERR
+				# canonical site
 				$canon = URI->new($site)->canonical;
 				if (length $canon->host == 0) {
 					print STDERR "$port->{fullpkgpath}: "
 					    . "empty host $canon\n";
+					$canon = undef;
 					next;
 				}
 			} catch {
+				$canon = undef;
 				print STDERR "$port->{fullpkgpath}: "
 				    . "caught error on $site\n";
 				debug(__PACKAGE__, $port, "$_");
-			} and next;
+			};
+			next unless($canon);
 
 			# check if path is absolute in the port
 			# XXX verbose, looks cosmetic
