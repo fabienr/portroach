@@ -5,7 +5,7 @@
 #   - Comments begin with '#' and extend to the end of the line
 #   - Variables are case insensitive, and may use spaces or underscores as word
 #     separators (i.e. ports dir == ports_dir)
-#   - Variables are separated from their values by a single '='
+#   - Variables are separated from their values by a single '=' or '+='
 #   - Paths must have no trailing slash
 #   - Use quotes if you need to retain leading/trailing whitespace
 #   - You can reuse previously set variables, like: %(name) - these variables
@@ -15,18 +15,17 @@
 
 # Space saving variables (only used within this file)
 
-prefix           = /var/
-tmpdir           = /tmp
-wwwdir           = %(prefix)/www/
+prefix =	/var/
+tmpdir =	/tmp
+wwwdir =	%(prefix)/www/
 
 #-- User Privileges -----------------------------------------------------------
 
-# If these are not empty, portroach will switch to this
-# user/group as soon as is practical after starting (if it
-# is running as root).
+# If these are not empty, portroach will switch to this user/group as soon as
+# is practical after starting (if it is running as root).
 
-#user             = portroach
-#group            = portroach
+#user =		portroach
+#group =	portroach
 
 #-- Directories ---------------------------------------------------------------
 
@@ -38,81 +37,79 @@ templates dir =	/usr/local/share/portroach/templates/dynamic
 
 #-- Limit Processing ----------------------------------------------------------
 
-# The following three variables are comma-separated lists of
-# items that portroach should process. If left empty, portroach
-# will not limit itself, and will process the whole ports tree.
+# The following three variables are comma-separated lists of items that
+# portroach should process. If left empty, portroach will not limit itself, and
+# will process the whole ports tree.
 #
 # For building the database these restrictions are mutually exclusive and
 # processed from top to bottom. Wildcards and commas are also ignored.
 
 # Items in the list may contain * and ? wildcard characters.
 
-restrict maintainer =        				# Limit to these maintainers
-restrict category   = 					# "     "  "     categories
-restrict port       =	  				# "     "  "     ports
+restrict maintainer =		# Limit to these maintainers
+restrict category =		# "     "  "     categories
+restrict port =			# "     "  "     ports
 
 #-- Mailing Settings ----------------------------------------------------------
 
-# These are only required if you plan to send out reminder mails
-# It is enabled by default because you will need to add some
-# addresses to the database for anything to happen anyway.
+# These are only required if you plan to send out reminder mails. It is enabled
+# by default because you will need to add some addresses to the database for
+# anything to happen anyway. The sender address will have the local hostname
+# attached if it is a bare username.
 
-# The sender address will have the local hostname attached if it
-# is a bare username.
+mail enable =	true
 
-mail enable      = true
-
-mail from        = portroach 				# Sender address
-mail subject     = OpenBSD ports you maintain which are out of date
-mail method      = sendmail  				# Can be 'sendmail' or 'smtp'
-#mail host        = localhost				# SMTP server, if method is 'smtp'
+mail from =	portroach 	# Sender address
+mail subject =	OpenBSD ports you maintain which are out of date
+mail method =	sendmail  	# Can be 'sendmail' or 'smtp'
+#mail host =	localhost	# SMTP server, if method is 'smtp'
 
 #-- Output Settings -----------------------------------------------------------
 
-# Timezone options. This is just eye-candy for template generation,
-# but setting it to anything other than 'GMT' will cause portroach
-# to use the local time, rather than GMT.
+# Timezone options. This is just eye-candy for template generation, but setting
+# it to anything other than 'GMT' will cause portroach to use the local time,
+# rather than GMT.
 
-local timezone   = GMT       				# Use Greenwich Time
+local timezone =	GMT	# Use Greenwich Time
 
 # Hide results for ports with no new distfile?
 
-hide unchanged   = false     				# Show ports with no updates.
+hide unchanged =	false	# Show ports with no updates.
 
 #-- Other Settings ------------------------------------------------------------
 
 #verbose =		true	# Enable verbose mode (--verbose)
 #debug =		true	# Enable debug mode (--debug)
 
-mastersite limit = 4         				# Give up after this many sites
+mastersite limit =	4	# Give up after this many sites
 
-# Master sites to ignore checking (might be fallback mirrors not carrying new versions)
-# Items in the list may contain * and ? wildcard characters.
-mastersite ignore = *openbsd.org/pub/OpenBSD/distfiles/*
+# Master sites to ignore checking (might be fallback mirrors not carrying new
+# versions). Items in the list may contain * and ? wildcard characters.
+mastersite ignore =	*openbsd.org/pub/OpenBSD/distfiles/*
 
 # Stop checking other site if old/new version are found, default to true
-#oldfound enable	= false
-#newfound enable	= false
+#oldfound enable =	false
+#newfound enable =	false
 
-precious data		= false	# Don't write anything to database
-#regress		= true	# Override database on regression (--regress)
+precious data =		false	# Don't write anything to database
+#regress =		true	# Override database on regression (--regress)
 
-num children     = 15        				# How many worker children to spawn
-workqueue size   = 20        				# How many ports per child at a time
+num children =		15	# How many worker children to spawn
+workqueue size =	20	# How many ports per child at a time
 
-# If you're using portroach with a something other than the
-# FreeBSD ports tree, switch this off to disable rejection of
-# non-FreeBSD distfiles (such as 1.3.2-win32.zip).
+# If you're using portroach with a something other than the FreeBSD ports tree,
+# switch this off to disable rejection of non-FreeBSD distfiles (such as
+# 1.3.2-win32.zip).
 #
-#freebsdhacks enable = true
+#freebsdhacks enable =	true
 
 # HTTP/FTP options
 
-http timeout     = 60       				# Timeout in seconds
+http timeout =		60	# Timeout in seconds
 
-ftp timeout      = 60       				# Timeout in seconds
-ftp passive      = true      				# Try to use passive FTP
-ftp retries      = 3         				# Give up after this many failures
+ftp timeout =		60	# Timeout in seconds
+ftp passive =		true	# Try to use passive FTP
+ftp retries =		3	# Give up after this many failures
 
 # The following tell portroach how to deal with sites which have a robots.txt
 # file. Possible values:
@@ -127,27 +124,26 @@ ftp retries      = 3         				# Give up after this many failures
 # crawlers from indexing pages, and thus 'strict' is likely to affect the
 # number of results we can gather.
 
-robots enable    = true      				# Check for robots.txt files
-robots checking  = strict    				# Strict robots.txt checking
+robots enable =		true	# Check for robots.txt files
+robots checking =	strict	# Strict robots.txt checking
 
 # GitHub personal access token, only needs 'public_repo' scope.
 # Obtained at: https://github.com/settings/tokens
-#github token =	xxx
+#github token =		xxx
 
 # Database connection details
 
-db user          = portroach 				# Database username
-db name          = portroach 				# Database name
-db pass          = portroach   				# Password
+db user =		portroach # Database username
+db name =		portroach # Database name
+db pass =		portroach # Password
 
 # These two are only used for db_connstr, below
 
-db host          =           				# Host
-db port          =           				# Port
+db host =			# Host
+db port =			# Port
 
-db connstr       = DBI:Pg:dbname=%(db_name)
-#db connstr       = DBI:Pg:dbname=%(db_name);host=%(db_host);port=%(db_port)
-#db connstr       = DBI:SQLite:dbname=/var/db/portroach.db
+db connstr =		DBI:Pg:dbname=%(db_name)
+#db connstr =		DBI:Pg:dbname=%(db_name);host=%(db_host);port=%(db_port)
+#db connstr =		DBI:SQLite:dbname=/var/db/portroach.db
 
-
-# ex: ts=4 sw=4
+# ex: ts=8 sw=8
