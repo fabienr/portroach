@@ -29,10 +29,11 @@
         <p>
             Notes:
             <ul>
-                <li>Port version strings are derived from DISTNAME values; they are not in "ports format"</li>
+                <li>Port version strings are derived from DISTFILES values;
+                    they are not in "ports format"</li>
                 <li>
-                    Updated/Checked time is when the database was updated and when a new distfile scan was
-                    done, respectively.
+                    Updated/Checked time is when the database was updated and
+                    when a new distfile scan was done, respectively.
                 </li>
             </ul>
         </p>
@@ -46,7 +47,7 @@
             Key for the 'M' column:
         </p>
         <ul>
-            <li>G = file was found by sending incremental version guesses to server.</li>
+            <li>G = file was found by sending incremental version guesses.</li>
             <li>L = file was found in FTP or HTTP directory index.</li>
             <li>X = port is ignored - new versions are not reported.</li>
             <li>S = file was found with dedicated site handler.</li>
@@ -76,7 +77,11 @@
         <tbody>
 %%:         <tr>
 %%:             <td>%%(head)</td>
-%%:             <td><a href="http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/%%(basepkgpath)">%%(ver)</a></td>
+%%:             <td>
+%%:  <a href="http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/%%(basepkgpath)">
+%%:  %%(ver)
+%%:  </a>
+%%:             </td>
 %%:             <td>%%(new)</td>
 %%:             <td>%%(updated)</td>
 %%:             <td>%%(checked)</td>
