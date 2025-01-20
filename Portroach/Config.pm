@@ -57,58 +57,58 @@ my (@paths, %settings_types, $bool_opts);
 # Useful settings
 
 %settings = (
-	templates_dir   	=> 'templates',
-	html_data_dir   	=> '_html',
-	sqlports                => '/usr/local/share/sqlports',
+	templates_dir		=> 'templates',
+	html_data_dir		=> '_html',
+	sqlports		=> '/usr/local/share/sqlports',
 
-	datasrc         	=> 'Portroach::DataSrc::Ports',
-	datasrc_opts    	=> '',
+	datasrc			=> 'Portroach::DataSrc::Ports',
+	datasrc_opts		=> '',
 
-	regress			=> 0,		# Don't override database on regression
-	precious_data   	=> 0, 		# Don't write anything to database
-	num_children    	=> 15,		# Number of child processes to spawn
-	workqueue_size  	=> 20,		# Size of work queue per child
-	ftp_retries     	=> 3, 		# Retry on "connections-per-IP" failures
-	ftp_passive     	=> 1, 		# Use passive FTP where possible
-	ftp_timeout     	=> 120,		# FTP timeout, in seconds
-	http_timeout    	=> 120,		# HTTP timeout, in seconds
+	regress			=> 0,	# Don't override database on regression
+	precious_data		=> 0,	# Don't write anything to database
+	num_children		=> 15,	# Number of child processes to spawn
+	workqueue_size		=> 20,	# Size of work queue per child
+	ftp_retries		=> 3,	# Retry on "connections-per-IP" failures
+	ftp_passive		=> 1,	# Use passive FTP where possible
+	ftp_timeout		=> 120,	# FTP timeout, in seconds
+	http_timeout		=> 120,	# HTTP timeout, in seconds
 
 	mastersite_limit	=> 4,
 	mastersite_ignore	=> '',
-	oldfound_enable 	=> 1,
-	newfound_enable 	=> 1,
+	oldfound_enable		=> 1,
+	newfound_enable		=> 1,
 
-	restrict_maintainer => '',
-	restrict_category   => '',
-	restrict_port       => '',
+	restrict_maintainer	=> '',
+	restrict_category	=> '',
+	restrict_port		=> '',
 
-	robots_enable   	=> 1,
-	robots_checking 	=> 'strict',
+	robots_enable		=> 1,
+	robots_checking		=> 'strict',
 
-	local_timezone  	=> 'GMT',
+	local_timezone		=> 'GMT',
 
 	freebsdhacks_enable	=> 1,
 	sillystrings_enable	=> 0,
 
-	default_html_sort  	=> 'maintainer',
+	default_html_sort	=> 'maintainer',
 
-	db_user         	=> APPNAME,
-	db_name         	=> APPNAME,
-	db_connstr      	=> 'DBI:Pg:dbname='.APPNAME,
+	db_user			=> APPNAME,
+	db_name			=> APPNAME,
+	db_connstr		=> 'DBI:Pg:dbname='.APPNAME,
 
-	mail_enable     	=> 1,
-	mail_from       	=> APPNAME,
-	mail_subject    	=> '',
-	mail_method     	=> 'sendmail',
-	mail_host       	=> 'localhost',
+	mail_enable		=> 1,
+	mail_from		=> APPNAME,
+	mail_subject		=> '',
+	mail_method		=> 'sendmail',
+	mail_host		=> 'localhost',
 
-	user            	=> '',
-	group           	=> '',
+	user			=> '',
+	group			=> '',
 
-	debug           	=> 0,
-	verbose         	=> 0,
+	debug			=> 0,
+	verbose			=> 0,
 
-	hide_unchanged  	=> 0,
+	hide_unchanged		=> 0,
 
 	output_type		=> 'dynamic',
 );
@@ -169,8 +169,7 @@ if ($settings{restrict_port} =~ /\//) {
 	# restrict_category.
 	my %rcats;
 
-	%rcats = map +($_, 1),
-		split /,/, $settings{restrict_category};
+	%rcats = map +($_, 1), split /,/, $settings{restrict_category};
 
 	foreach (split /,/, $settings{restrict_port}) {
 		if (/^(.*)\/(.*)$/) {
@@ -217,7 +216,7 @@ sub ParseConfigFile
 
 	while (my $line = <$cf>)
 	{
-		my ($var, $val, $quoted);
+		my ($op_add, $var, $val, $quoted);
 
 		$lineno++;
 
@@ -227,8 +226,9 @@ sub ParseConfigFile
 		# Skip empty lines
 		next unless ($line);
 
-		if ($line =~ /^\s*(.*?)\s*=\s*(.*?)\s*$/) {
-			($var, $val) = ($1, $2);
+		if ($line =~ /^\s*(.*?)\s*(\+?=)\s*(.*?)\s*$/) {
+			($var, $val) = ($1, $3);
+			$op_add = 1 if ($2 eq "+=");
 		} else {
 			next;
 		}
@@ -261,7 +261,11 @@ sub ParseConfigFile
 			/ge
 		);
 
-		$$varlist{$var} = $val;
+		if ($op_add) {
+			$$varlist{$var} = $$varlist{$var}.$val;
+		} else {
+			$$varlist{$var} = $val;
+		}
 	}
 
 	close $cf;
