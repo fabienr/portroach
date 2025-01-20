@@ -30,14 +30,11 @@ wwwdir           = %(prefix)/www/
 
 #-- Directories ---------------------------------------------------------------
 
-html data dir    = %(wwwdir)/portroach 		# Where to put generated HTML
+# Where to put generated HTML
+html data dir =	%(wwwdir)/portroach
 
-templates dir    = /usr/local/share/portroach/templates # Where HTML templates are kept
-
-# Generate dynamic (AngularJS) pages or just 'json'.
-# defaults to 'dynamic'.
-
-#output type = dynamic
+# Where HTML templates are kept
+templates dir =	/usr/local/share/portroach/templates/dynamic
 
 #-- Limit Processing ----------------------------------------------------------
 

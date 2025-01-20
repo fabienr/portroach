@@ -1517,7 +1517,7 @@ sub GenerateHTML
 	finish_sql($dbh, \%sths);
 	$dbh->disconnect;
 
-	my $_dir = "$settings{templates_dir}/$settings{output_type}/assets/";
+	my $_dir = "$settings{templates_dir}/assets/";
 	return 1 unless (-d $_dir);
 
 	print "Copying assets...\n";

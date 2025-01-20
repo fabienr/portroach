@@ -109,8 +109,6 @@ my (@paths, %settings_types, $bool_opts);
 	verbose			=> 0,
 
 	hide_unchanged		=> 0,
-
-	output_type		=> 'dynamic',
 );
 
 
