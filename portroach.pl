@@ -1255,7 +1255,7 @@ sub GenerateHTMLPorts
 sub GenerateHTML
 {
 	my (%sths, %outdata, %totals, @assets, @results, $dbh, $sth, $template,
-	    $row, $fh, $total, $outdated, $maintainers);
+	    $row, $fh, $total, $outdated, $unknow, $maintainers);
 
 	$dbh = connect_db();
 
@@ -1287,6 +1287,65 @@ sub GenerateHTML
 	$outdata{author}  = AUTHOR;
 
 	# Produce indexes pages
+	
+	print "Generating dynamic categories.html\n";
+
+	$template = Portroach::Template->new('categories.html')
+	    or die "categories.html template not found!\n";
+
+	$sth = $dbh->prepare("SELECT * FROM categories") or die DBI->errstr;
+	$sth->execute;
+
+	$total = $outdated = $unknow = 0;
+	while ($row = $sth->fetchrow_hashref) {
+		$row->{link} = "cat_".$row->{cat};
+		$row->{link} =~ tr|/|_|;
+		$row->{percentage} = 0 + sprintf('%.2f', $row->{percentage})
+		    if ($row->{percentage});
+		$row->{total} += 0 if ($row->{total});
+		$row->{withnewdistfile} += 0 if ($row->{withnewdistfile});
+		$row->{unknow} += 0 if ($row->{unknow});
+
+		$template->pushrow($row);
+		push(@results, $row);
+
+		$total += $row->{total};
+		$unknow += $row->{unknow};
+		$outdated += $row->{withnewdistfile};
+	}
+
+	$sth->finish;
+
+	die("No categories found; database have been built previously?")
+	    unless ($total);
+
+	$outdata{total_ports} = $total;
+	$outdata{total_unknow} = $unknow;
+	$outdata{total_outdated} = $outdated;
+	$outdata{outdated_percentage} = sprintf('%.2f',($outdated/$total)*100);
+	$outdata{unknow_percentage} = sprintf('%.2f',($unknow/$total)*100);
+
+	$template->applyglobal(\%outdata);
+	# XXX output categories as index.html
+	$template->output("index.html");
+	$template->reset;
+
+	$totals{results} = \@results;
+	$totals{summary} = {
+	    'total_ports'         => $total,
+	    'total_unknow'        => $unknow,
+	    'total_outdated'      => $outdated,
+	    'outdated_percentage' => sprintf('%.2f',($outdated/$total)*100),
+	    'unknow_percentage' => sprintf('%.2f',($unknow/$total)*100),
+	};
+
+	open($fh, '>>', "$settings{html_data_dir}/json/categories.json")
+	    or die "categories.json: $!";
+	print $fh JSON::encode_json(\%totals);
+	close($fh);
+
+	undef $totals{results};
+	undef @results;
 
 	print "Generating dynamic maintainers.html\n";
 
@@ -1296,6 +1355,7 @@ sub GenerateHTML
 	$sth = $dbh->prepare("SELECT * FROM maintainers") or die DBI->errstr;
 	$sth->execute;
 
+	$total = $outdated = 0;
 	while ($row = $sth->fetchrow_hashref) {
 		if ($row->{maintainer}) {
 			$row->{maintainer} =~ s/\>[\s\,]+([^\s])/\>& $1/g;
@@ -1308,6 +1368,7 @@ sub GenerateHTML
 		$row->{percentage} = 0 + sprintf('%.2f', $row->{percentage})
 		    if ($row->{percentage});
 		$row->{total} += 0 if ($row->{total});
+		$row->{unknow} += 0 if ($row->{unknow});
 		$row->{withnewdistfile} += 0 if ($row->{withnewdistfile});
 
 		$template->pushrow($row);
@@ -1315,85 +1376,30 @@ sub GenerateHTML
 
 		$maintainers++;
 		$total += $row->{total};
+		$unknow += $row->{unknow};
 		$outdated += $row->{withnewdistfile};
 	}
 	
 	$sth->finish;
 
-	$outdata{total_ports} = $total;
-	$outdata{total_outdated} = $outdated;
+	die("No maintainers found; database have been built previously?")
+	    unless ($total);
+	die("total ports mismatch between maintainers & results")
+	    if ($outdata{total_ports} != $total);
+	die("total outdated mismatch between maintainers & results")
+	    if ($outdata{total_outdated} != $outdated);
+
 	$outdata{total_maintainers} = $maintainers;
-	$outdata{outdated_percentage} = sprintf('%.2f',($outdated/$total)*100);
 
 	$template->applyglobal(\%outdata);
 	$template->output("maintainers.html");
 	$template->reset;
 
-	die("No maintainers found; database have been built previously?")
-	    unless ($total);
-
 	$totals{results} = \@results;
-	$totals{summary} = {
-	    'total_ports'         => $total,
-	    'total_outdated'      => $outdated,
-	    'total_maintainers'   => $maintainers,
-	    'outdated_percentage' => sprintf('%.2f',($outdated/$total)*100),
-	};
+	$totals{summary}{total_maintainers} = $maintainers;
 
 	open($fh, '>>', "$settings{html_data_dir}/json/maintainers.json")
 	    or die "maintainers.json: $!";
-	print $fh JSON::encode_json(\%totals);
-	close($fh);
-
-	undef $totals{results};
-	undef @results;
-
-	print "Generating dynamic categories.html\n";
-
-	$template = Portroach::Template->new('categories.html')
-	    or die "categories.html template not found!\n";
-
-	$sth = $dbh->prepare("SELECT * FROM categories") or die DBI->errstr;
-	$sth->execute;
-
-	$total = $outdated = 0;
-	while ($row = $sth->fetchrow_hashref) {
-		$row->{link} = "cat_".$row->{cat};
-		$row->{link} =~ tr|/|_|;
-		$row->{percentage} = 0 + sprintf('%.2f', $row->{percentage})
-		    if ($row->{percentage});
-		$row->{total} += 0 if ($row->{total});
-		$row->{withnewdistfile} += 0 if ($row->{withnewdistfile});
-		$row->{unknow} += 0 if ($row->{unknow});
-		$row->{guessed} += 0 if ($row->{guessed});
-		$row->{indexed} += 0 if ($row->{indexed});
-		$row->{handled} += 0 if ($row->{handled});
-		$row->{ignored} += 0 if ($row->{ignored});
-
-		$template->pushrow($row);
-		push(@results, $row);
-
-		$total += $row->{total};
-		$outdated += $row->{withnewdistfile};
-	}
-
-	$sth->finish;
-
-	$template->applyglobal(\%outdata);
-	# XXX output categories as index.html
-	$template->output("index.html");
-	$template->reset;
-
-	die("No categories found; database have been built previously?")
-	    unless ($total);
-	die("total ports mismatch between categories & results")
-	    if ($outdata{total_ports} != $total);
-	die("total outdated mismatch between categories & results")
-	    if ($outdata{total_outdated} != $outdated);
-
-	$totals{results} = \@results;
-	open($fh, '>>', "$settings{html_data_dir}/json/categories.json")
-	    or die "categories.json: $!";
 	print $fh JSON::encode_json(\%totals);
 	close($fh);
 
@@ -1431,6 +1437,7 @@ sub GenerateHTML
 	$sth->finish;
 
 	$outdata{total_hosts} = $total;
+
 	$template->applyglobal(\%outdata);
 	$template->output("sites.html");
 	$template->reset;
@@ -1439,6 +1446,8 @@ sub GenerateHTML
 	    if ($total == 0);
 
 	$totals{results} = \@results;
+	$totals{summary}{total_hosts} = $total;
+
 	open($fh, '>>', "$settings{html_data_dir}/json/sites.json")
 	    or die "sites.json: $!";
 	print $fh JSON::encode_json(\%totals);
@@ -1448,7 +1457,34 @@ sub GenerateHTML
 	undef @results;
 	undef %totals;
 
+	print "Creating restricted ports (portconfig) page...\n";
+
+	$template = Portroach::Template->new('restricted-ports.html')
+	    or die "restricted-ports.html template not found!\n";
+
+	$sths{portdata_selectall_limited}->execute;
+
+	while (my $row = $sths{portdata_selectall_limited}->fetchrow_hashref) {
+		$row->{limiteven}      = $row->{limiteven}  ? 'EVEN' : 'ODD';
+		$row->{limitevenwhich} = $row->{limitwhich} ? (
+		    $row->{limitwhich}.':'.$row->{limiteven}) : '';
+
+		$template->pushrow($row);
+		push(@results, $row);
+	}
+
+	$template->applyglobal(\%outdata);
+	$template->output('restricted-ports.html');
+
+	open($fh, '>', "$settings{html_data_dir}/json/restricted.json")
+	    or die "restricted.json: $!";
+	print $fh JSON::encode_json(\@results);
+	close($fh);
+
+	undef @results;
+
 	# Produce ports pages
+
 	$template = Portroach::Template->new('ports.html')
 	    or die "ports.html template not found!\n";
 
@@ -1476,28 +1512,7 @@ sub GenerateHTML
 	GenerateHTMLPorts($sth, $sths{portdata_selectall_site},
 	    $template, \%outdata, "site");
 
-	print "Creating restricted ports (portconfig) page...\n";
-
-	$template = Portroach::Template->new('restricted-ports.html')
-	    or die "restricted-ports.html template not found!\n";
-	$sths{portdata_selectall_limited}->execute;
-	$outdata{index} = 'restricted-ports';
-	$template->applyglobal(\%outdata);
-	while (my $row = $sths{portdata_selectall_limited}->fetchrow_hashref) {
-		$row->{limiteven}      = $row->{limiteven}  ? 'EVEN' : 'ODD';
-		$row->{limitevenwhich} = $row->{limitwhich} ? (
-		    $row->{limitwhich}.':'.$row->{limiteven}) : '';
-
-		$template->pushrow($row);
-		push(@results, $row);
-	}
-	$template->output('restricted-ports.html');
-
-	open($fh, '>', "$settings{html_data_dir}/json/restricted.json")
-	    or die "restricted.json: $!";
-	print $fh JSON::encode_json(\@results);
-	close($fh);
-	undef @results;
+	# Cleanup & copy assets
 
 	finish_sql($dbh, \%sths);
 	$dbh->disconnect;
@@ -1506,6 +1521,7 @@ sub GenerateHTML
 	return 1 unless (-d $_dir);
 
 	print "Copying assets...\n";
+
 	emptydir("$settings{html_data_dir}/assets/");
 	@assets = glob("$_dir/*");
 	foreach my $asset (glob("$_dir/*")) {
