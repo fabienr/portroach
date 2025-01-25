@@ -199,8 +199,8 @@ sub emptydir
 # Desc: Determine if a string looks like a valid version. If two strings are
 #       provided, also check they both have the same schema.
 #
-# Args: $version 1 - Version or full filename.
-#       $version 2 - Version or full filename.
+# Args: $version 1 - Version to test.
+#       $version 2 - Version to match.
 #
 # Retn: $isversion  - Looks like a version?
 #------------------------------------------------------------------------------
@@ -224,14 +224,16 @@ sub isversion
 	if ($vera =~ /^\d+[\.\-\_]\d+/) {
 		return 1 unless ($verb);
 		return 1 if ($verb =~ /^\d+[\.\-\_]\d+/);
+		$verb = quotemeta $verb;
+		return 1 if ($vera =~ /^$verb/); # 7.0.1 ~ 7
 		return 0;
 	} elsif ($vera =~ /^$date_regex$/) {
 		return 1 unless ($verb);
 		return 1 if ($verb =~ /^$date_regex$/);
 		return 0;
-	} elsif ($vera =~ /^\d+\D?$/) {
+	} elsif ($vera =~ /^\d+(\D{,2}\d{,2})?([\.\-\_].+)?$/) {
 		return 1 unless ($verb);
-		return 1 if ($verb =~ /^\d+$/);
+		return 1 if ($verb =~ /^\d+(\D{,2}\d{,2})?([\.\-\_].+)?$/);
 		return 0;
 	}
 
