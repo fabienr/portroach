@@ -314,6 +314,8 @@ sub Check
 	    !$settings{restrict_maintainer}) {
 		$sths{sitedata_reset}->execute;
 		info(0, "Doing full check, reset site data.");
+	} else {
+		info(0, "Restricted check, do not reset site data.");
 	}
 
 	if ($nofork) {
