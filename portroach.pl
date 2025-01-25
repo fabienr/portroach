@@ -219,7 +219,8 @@ sub ExecArgs
 	}
 	elsif ($cmd eq 'generate')
 	{
-		Portroach::Template->templatedir($settings{templates_dir} . '/' . $settings{output_type});
+		Portroach::Template->templatedir($settings{templates_dir} .
+		    '/dynamic');
 		Portroach::Template->outputdir($settings{html_data_dir});
 
 		$res = GenerateHTML();
