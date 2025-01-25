@@ -409,6 +409,8 @@ sub Check
 
 	(1) while (wait != -1);
 
+	# XXX clean outdated robots_nextcheck, only HTTP handler use it
+
 	if ($sths{portdata_select}->rows == 0) {
 		print "No ports found.\n";
 	} elsif (!$nofork) {
@@ -808,9 +810,8 @@ sub FindNewestFile
 		$old_v = $port->{ver};
 
 		if ($file =~ /^(.*)\/(.*?)$/) {
-			# Files from SiteHandlers can come with paths
-			# attached; we're only handling absolute paths
-			# here though
+			# Files from SiteHandlers can come with url/paths;
+			# we're only handling absolute paths and url (later on)
 			$poss_path = $1;
 			$file = $2;
 			debug(__PACKAGE__, $port, "path detected, split: "
@@ -847,7 +848,7 @@ sub FindNewestFile
 
 			if ($new_v eq $port->{ver}) {
 				debug(__PACKAGE__, $port, "old found: "
-				    . "new $file, old $port->{ver}");
+				    . "file $file, old $port->{ver}");
 				$old_found = 1;
 				next;
 			}
@@ -915,6 +916,7 @@ sub FindNewestFile
 		}
 
 		# Only allow new major version if port isn't version-specific
+
 		if ($port->{limitver}) {
 			unless ($new_v =~ /$port->{limitver}/) {
 				debug(__PACKAGE__, $port,
@@ -975,6 +977,8 @@ sub FindNewestFile
 			if (!defined($poss_match) or
 			    vercompare($new_v, $poss_match)) {
 				$poss_match = $new_v;
+
+				# If custom url or path, use it
 				if ($poss_path =~ /^https?:\/\/[^\/]+\//) {
 					$poss_url = URI->new($poss_path);
 				} else {
@@ -982,6 +986,8 @@ sub FindNewestFile
 					$poss_url->path($poss_path)
 					    if ($poss_path);
 				}
+
+				# No url if there is no file (%%version)
 				if ($file) {
 					$poss_url->path($poss_url->path . '/')
 					    if ($poss_url !~ /\/$/);
@@ -989,6 +995,7 @@ sub FindNewestFile
 				} else {
 					$poss_url = "";
 				}
+
 				debug(__PACKAGE__, $port, "last found "
 				    . "poss $poss_match '$poss_url'");
 				next;
