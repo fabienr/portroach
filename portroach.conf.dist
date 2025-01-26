@@ -33,7 +33,7 @@ wwwdir =	%(prefix)/www/
 html data dir =	%(wwwdir)/portroach
 
 # Where HTML templates are kept
-templates dir =	/usr/local/share/portroach/templates/dynamic
+templates dir =	/usr/local/share/portroach/templates/
 
 #-- Limit Processing ----------------------------------------------------------
 
