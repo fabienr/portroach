@@ -16,6 +16,7 @@
 #------------------------------------------------------------------------------
 
 package Portroach::SiteHandler::FTP;
+use base Portroach::SiteHandler;
 
 use Portroach::Util;
 use Portroach::Config;

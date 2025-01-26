@@ -16,11 +16,11 @@
 #------------------------------------------------------------------------------
 
 package Portroach::SiteHandler::GitHub;
+use base Portroach::SiteHandler;
 
 use JSON qw(decode_json);
 use URI;
 
-use Portroach::SiteHandler;
 use Portroach::Util;
 use Portroach::Config;
 

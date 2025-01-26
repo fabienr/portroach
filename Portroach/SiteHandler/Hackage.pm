@@ -16,10 +16,10 @@
 #------------------------------------------------------------------------------
 
 package Portroach::SiteHandler::Hackage;
+use base Portroach::SiteHandler;
 
 use HTML::TokeParser;
 
-use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;

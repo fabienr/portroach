@@ -16,10 +16,10 @@
 #------------------------------------------------------------------------------
 
 package Portroach::SiteHandler::CPAN;
+use base Portroach::SiteHandler;
 
 use JSON qw(decode_json);
 
-use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;

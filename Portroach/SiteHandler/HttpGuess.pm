@@ -16,6 +16,7 @@
 #------------------------------------------------------------------------------
 
 package Portroach::SiteHandler::HttpGuess;
+use base Portroach::SiteHandler;
 
 use Portroach::Util;
 use Portroach::Config;
@@ -107,13 +108,13 @@ sub GetFiles
 			unless (($1.$2) =~
 			    /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/i) {
 				my $fullver = "";
-				while ($vo_nums =~ s/^(\d+?)[-_\.]?//) {
+				while ($vo_nums =~ s/^(\d+?)[\.\-\_]?//) {
 					$fullver .= $1;
 					last if ($fullver eq $nm_nums);
 				}
 
 				if ($fullver eq $nm_nums) {
-					$vr_nums =~ s/[-_\.]//g;
+					$vr_nums =~ s/[\.\-\_]//g;
 					next unless ($vr_nums =~ /^$nm_nums/);
 				}
 			}

@@ -26,10 +26,10 @@
 #------------------------------------------------------------------------------
 
 package Portroach::SiteHandler::SourceForge;
+use base Portroach::SiteHandler;
 
 use XML::Feed;
 
-use Portroach::SiteHandler;
 use Portroach::Util;
 
 use strict;

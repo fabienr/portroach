@@ -16,6 +16,7 @@
 #------------------------------------------------------------------------------
 
 package Portroach::SiteHandler::HTTP;
+use base Portroach::SiteHandler;
 
 use Portroach::Util;
 use Portroach::Config;

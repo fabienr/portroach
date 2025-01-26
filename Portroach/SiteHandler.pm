@@ -96,4 +96,85 @@ sub FindHandler
 }
 
 
+#------------------------------------------------------------------------------
+# Func: GetName()
+# Desc: By default return undef, sub for inheritance.
+#
+# Args: $url - A URL we want to extract name from.
+#
+# Retn: undef
+#------------------------------------------------------------------------------
+
+sub GetName
+{
+	return undef;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: FindName()
+# Desc: Iterate over known handlers to find one, if any, that handle the given
+#       site and return GetName()
+#
+# Args: $url - A URL we want to extract name from.
+#
+# Retn: $version or undef
+#------------------------------------------------------------------------------
+
+sub FindName
+{
+	my $self = shift;
+
+	my ($url) = @_;
+
+	my $name;
+
+	foreach my $class (@sitehandlers) {
+		return $name if ($name = $class->GetName($url));
+	}
+
+	return undef;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: GetVersion()
+# Desc: By default return undef, sub for inheritance.
+#
+# Args: $url - A URL we want to extract version from.
+#
+# Retn: undef
+#------------------------------------------------------------------------------
+
+sub GetVersion
+{
+	return undef;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: FindVersion()
+# Desc: Iterate over known handlers to find one, if any, that handle the given
+#       site and return GetVersion()
+#
+# Args: $url - A URL we want to extract version from.
+#
+# Retn: $version or undef
+#------------------------------------------------------------------------------
+
+sub FindVersion
+{
+	my $self = shift;
+
+	my ($url) = @_;
+
+	my $ver;
+
+	foreach my $class (@sitehandlers) {
+		return $ver if ($ver = $class->GetVersion($url));
+	}
+
+	return undef;
+}
+
 1;
