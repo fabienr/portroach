@@ -53,15 +53,19 @@ our @EXPORT = qw(
 	&isbeta
 	&chopbeta
 	&nametoregex
+	&vertoregex
 	&verguess
 	&vercompare
 	&betacompare
 	&checkevenodd
 	&extractfilenames
 	&extractdirectories
+	&extractsubdirectories
 	&extractsuffix
 	&tobasepkgpath
 	&fullpkgpathtoport
+	&fullpkgpathtosubcat
+	&path_absolute
 	&regress
 	&info
 	&debug
@@ -366,6 +370,31 @@ sub verguess
 	}
 
 	return @ver_guesses;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: vertoregex()
+# Desc: Transform version into a regex to matches. Escape regex special chars
+#       like + ? { } ( ) and make them optional. Do lazy matching against
+#       common separator - _ . and single digit to match any char or
+#       none.
+#
+# Args: $ver  - Version string to transform into a regex
+#
+# Retn: $regex - A regular expression to match another name against
+#------------------------------------------------------------------------------
+
+sub vertoregex
+{
+	my $ver = shift;
+	my $regex = lc $ver;
+
+	$regex =~ s/([\+\?\{\}])/\\$1?/g;
+	$regex =~ s/[\.\-\_]/.?/g;
+	$regex =~ s/^($lang_regex)/(?:$1)?\[\\-\\_\]?/;
+
+	return $regex;
 }
 
 
@@ -711,11 +740,82 @@ sub extractdirectories
 	return 1;
 }
 
+
+#------------------------------------------------------------------------------
+# Func: extractsubdirectories()
+# Desc: Extract directories from a mastersite index, going down the path only.
+#
+# Args: $data    - Data from master site request.
+#       \$dirs   - Where to put directories found, only full path, ^/
+#       $site    - Actual, full path on the site to resolve/filter link.
+#
+# Retn: $success - true/false
+#------------------------------------------------------------------------------
+
+sub extractsubdirectories
+{
+	my ($data, $dirs, $site) = @_;
+
+	my $host_q = quotemeta $site->host;
+	my $path_q = quotemeta $site->path;
+
+	foreach (split "<", $data) {
+		if (/^a\s+href\s*=\s*('|")(.*\/)\1/gi) {
+			my $guess = $2;
+			# check same host, extract actual path
+			# XXX check type also ?
+			if ($guess =~ /^.*?:\/\//) {
+				next if ($guess !~ /^.*?:\/\/$host_q\//);
+				$guess =~ s/^.*?:\/\/$host_q\//\//;
+			}
+			$guess = $site->path.$guess if ($guess !~ /^\//);
+			$guess = path_absolute($guess);
+			next if ($guess !~ /^$path_q[^\/]+/);
+			push @$dirs, $guess;
+		}
+	}
+
+	return 1;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: extractsuffix()
+# Desc: Extract suffixe from a filename
+#
+# Args: $filename - Data from master site request.
+#
+# Retn: $sufx     - true/false
+#------------------------------------------------------------------------------
+
 sub extractsuffix
 {
 	my $sufx = shift;
 	return unless ($sufx =~ s/^(.*?)(($ext_regex)+)$/$2/i);
 	return $sufx;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: path_absolute()
+# Desc: Given a URL string, trim ../ ./ // and may return ""
+#
+# Args: $path - URL to trim
+#
+# Retn: $abspath - URL trimmed.
+#------------------------------------------------------------------------------
+
+sub path_absolute
+{
+	my $abspath = shift;
+	while ($abspath =~ s:
+		/+(?=/)
+		| ^/?\.\.(?=/)
+		| ^\.\.$
+		| (?<=/)(?!\.\./)[^/]+/\.\./
+		| (?<![^/])\./
+		::x) {};
+	return $abspath;
 }
 
 #------------------------------------------------------------------------------
@@ -957,6 +1057,34 @@ sub fullpkgpathtoport
 	$port =~ s/^([^\-]+)\-\d+$/$1/;
 
 	return $port;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: fullpkgpathtosubcat()
+# Desc: Extract the port sub-category from cat/subcat/port.
+#
+# Args: $fullpkgpath - Package path for a specific port variation.
+#
+# Retn: $cat         - undef or the sub-category of the port.
+#------------------------------------------------------------------------------
+
+sub fullpkgpathtosubcat
+{
+	my $fullpkgpath = shift;
+	my $cat = $fullpkgpath;
+
+	# Remove any versions, top category, flavors and subpackages.
+	$cat =~ s/,.*//g;
+	$cat =~ s/\/[\d\.]+(\/|$)/$1/g;
+	$cat =~ s/^[^\/]*\///g;
+
+	# There is no sub-category to extract, return undef
+	return if ($cat !~ /\//);
+
+	$cat =~ s/\/.*$//g;
+
+	return $cat;
 }
 
 
