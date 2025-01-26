@@ -1638,7 +1638,7 @@ sub MailMaintainers
 
 sub ShowUpdates
 {
-	my (%sths, $dbh);
+	my (%sths, $dbh, $maintainer, $count);
 
 	$dbh = connect_db();
 
@@ -1646,17 +1646,19 @@ sub ShowUpdates
 
 	$sths{portdata_selectupdated}->execute();
 
-	my $maintainer;
-
 	while (my $port = $sths{portdata_selectupdated}->fetchrow_hashref) {
 		if (!$maintainer || lc $maintainer ne lc $port->{maintainer}) {
-			info(1, " ") if ($maintainer);
+			info(0, "$maintainer, $count outdated port(s).")
+			    if ($maintainer);
 			$maintainer = $port->{maintainer};
-			info(0, "${maintainer}'s ports.");
+			$count = 0;
+			info(1, "\n${maintainer}'s ports:");
 		}
+		$count++;
 		info(1, "$port->{fullpkgpath}: "
 		    . "$port->{ver} -> $port->{newver}");
 	}
+	info(0, "$maintainer, $count outdated port(s).") if ($maintainer);
 
 	finish_sql($dbh, \%sths);
 	$dbh->disconnect;
