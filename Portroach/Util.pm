@@ -46,6 +46,8 @@ our @EXPORT = qw(
 	$month_regex
 	$ext_regex
 	$verprfx_regex
+	$verlike_regex
+	$lang_regex
 
 	&strchop
 	&emptydir
@@ -90,7 +92,7 @@ our @EXPORT = qw(
 #------------------------------------------------------------------------------
 
 our (%settings, @months, $date_regex, $beta_regex, $month_regex, $ext_regex,
-    $verprfx_regex);
+    $verprfx_regex, $verlike_regex, $lang_regex);
 
 my %beta_types;
 
@@ -137,6 +139,13 @@ $ext_regex = qr/(?:l|t?b|t?g|t?x)?z(?:2|st)?|
     zip/xi;
 
 $verprfx_regex = qr/(?:v|ver|r|rel|release)[\.\-\_]?(?=\d)/;
+
+$verlike_regex = qr/
+    \d+[\.\-\_]\d+[^\/]*?
+    |$date_regex
+    |\d{2,}([a-z]{,2}\d{,2})?/x;
+
+$lang_regex = qr/(?:hs|lua|mod|node|p5|perl|py\d?|ruby)/;
 
 #------------------------------------------------------------------------------
 # Func: strchop()
