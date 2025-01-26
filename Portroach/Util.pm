@@ -947,6 +947,7 @@ sub primarycategory
 	return $main_cat;
 }
 
+
 #------------------------------------------------------------------------------
 # Func: useragent()
 # Desc: Return LWP::UserAgent with default settings.
@@ -961,8 +962,10 @@ sub lwp_useragent
 	my $ua = LWP::UserAgent->new;
 	$ua->agent(USER_AGENT);
 	$ua->timeout($settings{http_timeout});
+	$ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0x00);
 	return $ua;
 }
+
 
 #------------------------------------------------------------------------------
 # Func: uri_filename()
