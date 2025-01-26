@@ -318,7 +318,7 @@ $sql{portdata_selectupdated} =
 	q(SELECT lower(maintainer) AS maintainer,
 	         fullpkgpath, name, ver, newver
 	    FROM portdata
-	   WHERE ver != newver
+	   WHERE newver IS NOT NULL
 	ORDER BY lower(maintainer), fullpkgpath);
 
 $sql{portdata_exists} =
