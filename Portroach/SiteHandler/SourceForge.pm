@@ -85,6 +85,28 @@ sub CanHandle
 
 
 #------------------------------------------------------------------------------
+# Func: GetName()
+# Desc: By default return undef, sub for inheritance.
+#
+# Args: $url - A URL we want to extract version from.
+#
+# Retn: undef
+#------------------------------------------------------------------------------
+
+sub GetName
+{
+	my $self = shift;
+
+	my ($ver) = @_;
+
+	if ($ver =~ m:^https?\://.*\.sourceforge\.net/sourceforge/(.*?)\/:) {
+		return $1;
+	} else {
+		return undef;
+	}
+}
+
+#------------------------------------------------------------------------------
 # Func: GetFiles()
 # Desc: Extract a list of files from the given URL. In the case of SourceForge,
 #       we are actually pulling the files from an RSS feed helpfully provided
