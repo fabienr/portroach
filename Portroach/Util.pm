@@ -300,10 +300,10 @@ sub chopbeta
 
 #------------------------------------------------------------------------------
 # Func: nametoregex()
-# Desc: Transform distfile/distname into a regex to matches. Handle optional
-#       lang prefix (ex: py could be py- py_ or none). Do lazy matching against
-#       common separator - _ . to matches any char or none. Escape regex special
-#       chars like + ? { } ( ) and make them optional.
+# Desc: Transform distfile/distname into a regex to matches. Escape regex
+#       special chars like + ? { } ( ) and make them optional. Do lazy matching
+#       against common separator - _ . and single digit to match any char or
+#       none. Handle optional lang prefix (ex: py could be py- py_ or none).
 #
 # Args: $name  - Name string to transform into a regex
 #
@@ -313,13 +313,79 @@ sub chopbeta
 sub nametoregex
 {
 	my $name = shift;
-	my $lang_re = '(node|p5|mod|py|ruby|hs)';
-	my $regex = lc $name;
+	my $regex;
+
+	return lc $name if ($name =~ /^$lang_regex$/i);
+
+	if ($name =~ /\//) {
+		foreach my $subname (split /\//, $name) {
+			$regex .= '|' if ($regex);
+			$regex .= nametoregex($subname);
+		}
+		return $regex;
+	}
+
+	$regex = lc $name;
+	$regex =~ s/([\+\?\{\}])/\\$1?/g;
+	$regex =~ s/[\.\-\_]/.?/g;
+	$regex =~ s/^($lang_regex)/(?:$1)?\[\\-\\_\]?/i;
+	$regex =~ s/^g/(?:g)?/i; # note, G for gnu ports: gtar -> tar
+
+	return $regex unless ($name =~ /\-|\+|\d|[A-Z]/);
+
+	my @names;
+	@names = (@names, split(/\-/, $name))
+		if (!@names && $name =~ /\-/);
+	@names = (@names, split(/\+/, $name))
+		if (!@names && $name =~ /\+/);
+	@names = (@names, split(/\d+/, $name))
+		if (!@names && $name =~ /\d+/);
+	@names = (@names, split(/(?=[A-Z])/, $name))
+		if (!@names && $name =~ /[A-Z]+/);
+	return $regex unless (scalar @names > 1);
+
+	foreach my $subname (@names) {
+		# skip if empty (consecutive delimiter)
+		next unless ($subname);
+		if ($subname eq "p5") {
+			$regex .= '|perl5?';
+			next;
+		}
+		if ($subname eq "py") {
+			$regex .= '|python';
+			next;
+		}
+		next if ($subname =~ /^$lang_regex$/);
+		next if (length $subname == 1);
+
+		my $q = nametoregex($subname);
+		$regex .= "|$q";
+	}
+
+	return lc $regex;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: vertoregex()
+# Desc: Transform version into a regex to matches. Escape regex special chars
+#       like + ? { } ( ) and make them optional. Do lazy matching against
+#       common separator - _ . and single digit to match any char or
+#       none.
+#
+# Args: $ver  - Version string to transform into a regex
+#
+# Retn: $regex - A regular expression to match another name against
+#------------------------------------------------------------------------------
+
+sub vertoregex
+{
+	my $ver = shift;
+	my $regex = lc $ver;
 
 	$regex =~ s/([\+\?\{\}])/\\$1?/g;
-	$regex =~ s/[\-\_\.]/\.?/g;
-	$regex =~ s/^$lang_re\\?[\-\_]?/(?:$1)?\[\\-\\_\]?/
-	    if ($regex =~ /^$lang_re.+/);
+	$regex =~ s/[\.\-\_]/.?/g;
+	$regex =~ s/^($lang_regex)/(?:$1)?\[\\-\\_\]?/;
 
 	return $regex;
 }
@@ -379,31 +445,6 @@ sub verguess
 	}
 
 	return @ver_guesses;
-}
-
-
-#------------------------------------------------------------------------------
-# Func: vertoregex()
-# Desc: Transform version into a regex to matches. Escape regex special chars
-#       like + ? { } ( ) and make them optional. Do lazy matching against
-#       common separator - _ . and single digit to match any char or
-#       none.
-#
-# Args: $ver  - Version string to transform into a regex
-#
-# Retn: $regex - A regular expression to match another name against
-#------------------------------------------------------------------------------
-
-sub vertoregex
-{
-	my $ver = shift;
-	my $regex = lc $ver;
-
-	$regex =~ s/([\+\?\{\}])/\\$1?/g;
-	$regex =~ s/[\.\-\_]/.?/g;
-	$regex =~ s/^($lang_regex)/(?:$1)?\[\\-\\_\]?/;
-
-	return $regex;
 }
 
 
