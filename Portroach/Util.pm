@@ -127,7 +127,7 @@ $date_regex  = qr/(?<!\d)\d{2,4}([\.\-\_]?)
 	unstable   => { re => 'unstable|dev|test',		rank => 2 },
 	alpha      => { re => 'alpha|a(?=\d+|$)',		rank => 3 },
 	beta       => { re => 'beta|b(?=\d+|$)',		rank => 4 },
-	prerelease => { re => 'pre.*?|p(?=\d+|$)',		rank => 5 },
+	prerelease => { re => 'pr.*?|p(?=\d+|$)',		rank => 5 },
 	relcand    => { re => 'rc|r(?=\d+|$)',			rank => 6 }
 );
 
