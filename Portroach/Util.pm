@@ -117,7 +117,8 @@ my %want_regex = (
 );
 
 $month_regex = qr/jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/;
-$date_regex  = qr/(?<!\d)\d{2,4}([\-\.]?)(?:\d{2}|$month_regex)\1\d{2,4}(?!\d)/;
+$date_regex  = qr/(?<!\d)\d{2,4}([\.\-\_]?)
+    (?:\d{2}|$month_regex)\1\d{2,4}(?!\d)/x;
 
 %beta_types = (
 	snapshot   => { re => 'svn|cvs|snap(?:shot)?|nightly',	rank => 1 },
@@ -135,7 +136,7 @@ $ext_regex = qr/(?:l|t?b|t?g|t?x)?z(?:2|st)?|
     mmdb|otf|pdf|phar|rar|rpm|run|sfc|shar|spl|tar|tgz|ttf|txi|txt|uqm|war|
     zip/xi;
 
-$verprfx_regex = qr/(?:v|ver|r|rel|release)[-\._]?(?=\d)/;
+$verprfx_regex = qr/(?:v|ver|r|rel|release)[\.\-\_]?(?=\d)/;
 
 #------------------------------------------------------------------------------
 # Func: strchop()
@@ -488,10 +489,12 @@ sub vercompare
 		my $date_regex = $date_regex;
 		$date_regex =~ s/\\1/\\3/g; # Bump internal backreference (evil)
 
-		if ($new =~ /^(.*?)[\-\.]?($date_regex)[\-\.]?(.*)$/i) {
+		# XXX -> [\.\-\_]
+		if ($new =~ /^(.*?)[\-\.]?($date_regex)[\-\.]?(.*)$/) {
 			my ($new_1, $new_2, $new_3) = ($1, $2, $4);
 
-			if ($old =~ /^(.*?)[\-\.]?($date_regex)[\-\.]?(.*)$/i) {
+			# XXX -> [\.\-\_]
+			if ($old =~ /^(.*?)[\-\.]?($date_regex)[\-\.]?(.*)$/) {
 				my ($old_1, $old_2, $old_3) = ($1, $2, $4);
 
 				if ($new_1 and $old_1) {
