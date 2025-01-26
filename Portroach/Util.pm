@@ -148,14 +148,14 @@ sub strchop
 {
 	my ($str, $limit) = @_;
 
-	my $slen = int ($limit / 2) - 3;
-	my $elen = ($limit - 3) - $slen;
+	my $slen = int ($limit / 2) - 1;
+	my $elen = ($limit - 1) - $slen;
 
 	return '' if (!$str or !$limit);
 
 	if (length $str > $limit)
 	{
-		return $str if ($str =~ s/^(.{$slen}).*(.{$elen})$/$1...$2/);
+		return $str if ($str =~ s/^(.{$slen}).*(.{$elen})$/$1%$2/);
 	}
 	elsif (length $str < $limit)
 	{
@@ -897,8 +897,8 @@ sub wantport
 
 		if ($port =~ $want_regex{port}) {
 			$matched++;
-		} elsif (defined $category
-				and "$category/$port" =~ $want_regex{port}) {
+		} elsif (defined $category and
+		    "$category/$port" =~ $want_regex{port}) {
 			$matched++;
 		}
 
@@ -1046,11 +1046,16 @@ sub restrict2regex
 		$item = lc $item;
 
 		# Quote literal stuff
-		$item =~ s/([^*?]+)/\Q$1\E/g;
+		$item =~ s/([^*?%_]+)/\Q$1\E/g;
 
 		# Transform wildcards to regex
 		$item =~ s/\*+/.*/g;
 		$item =~ s/\?/./g;
+
+		# Transform SQL wildcards to regex
+		$item =~ s/\%+/.*/g;
+		$item =~ s/\_/./g;
+
 	}
 
 	if (scalar @items) {

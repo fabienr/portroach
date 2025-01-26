@@ -160,24 +160,6 @@ GetOptions(
 	}}}
 ) or exit 1;
 
-# Clean-up some variables
-
-if ($settings{restrict_port} =~ /\//) {
-	# Ensure cats in restrict_port make it into
-	# restrict_category.
-	my %rcats;
-
-	%rcats = map +($_, 1), split /,/, $settings{restrict_category};
-
-	foreach (split /,/, $settings{restrict_port}) {
-		if (/^(.*)\/(.*)$/) {
-			$rcats{$1} = 1;
-		}
-	}
-
-	$settings{restrict_category} = join(',', keys %rcats);
-}
-
 
 #------------------------------------------------------------------------------
 # Func: ParseConfigFile()
