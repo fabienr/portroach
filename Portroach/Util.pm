@@ -788,7 +788,7 @@ sub extractfilenames
 
 #------------------------------------------------------------------------------
 # Func: extractdirectories()
-# Desc: Extract directories from a mastersite index
+# Desc: Extract directories matching a version shema
 #
 # Args: $data    - Data from master site request.
 #       \$dirs   - Where to put directories found.
@@ -800,8 +800,8 @@ sub extractdirectories
 {
 	my ($data, $dirs) = @_;
 
-	foreach (split "\n", $data) {
-		while (/<a href=(['"])(.*?)\/\1.*?>\2(?:\/<\/a>|<\/a>\/)(?:.*?)/gi) {
+	foreach (split "<", $data) {
+		if (/^a\s+href\s*=\s*('|")(.*\/$verlike_regex\/(.*\/)?)\1/gi) {
 			push @$dirs, $2;
 		}
 	}
