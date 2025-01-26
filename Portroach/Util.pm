@@ -463,6 +463,20 @@ sub vercompare
 {
 	my ($new, $old) = @_;
 
+	# 10.2+2.0.1 Vs 10+2.0
+	if ($new =~ /\+/ && $old =~ /\+/) {
+		my @news = split('\+', $new);
+		my @olds = split('\+', $old);
+		if (scalar @news == scalar @olds) {
+			for my $i (0 .. $#news) {
+				my $new  = $news[$i];
+				my $old = $olds[$i];
+				next if ($new eq $old);
+				return vercompare($new, $old);
+			}
+		}
+	}
+
 	# Check for version with a single alphabetical character as to not to
 	# get entangled with rc,beta,alpha,whatnot. These are dealt with below.
 	# Get the last char, check if the remaining version is equal (otherwise
@@ -534,7 +548,7 @@ sub vercompare
 	# numbers, take care to split them and compare
 	# individually.
 
-	unless ($new =~ /^$date_regex$/i && $old =~ /^$date_regex$/i)
+	unless ($new =~ /^$date_regex$/ && $old =~ /^$date_regex$/)
 	{
 		my $date_regex = $date_regex;
 		$date_regex =~ s/\\1/\\3/g; # Bump internal backreference (evil)
@@ -586,6 +600,9 @@ sub vercompare
 
 	my @nums_new = split /\D+/, $new;
 	my @nums_old = split /\D+/, $old;
+
+	# Make sure x.y.z is newer dans xxxxx
+	return 0 if ($#nums_new == 1 && $#nums_old > 1);
 
 	foreach my $n (0 .. $#nums_new) {
 		# All preceding components are equal, so assume newer.
