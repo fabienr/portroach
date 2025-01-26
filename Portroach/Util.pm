@@ -256,6 +256,7 @@ sub isbeta
 	my ($version) = @_;
 
 	return (
+		# XXX => \.\-\_ add ~ everywhere ?
 		$version =~ /^(.*)[-_~.](?:$beta_regex).*$/gi
 			or $version =~ /^(.*)(?<=\d)(?:$beta_regex).*$/gi
 	);
@@ -277,10 +278,10 @@ sub chopbeta
 
 	$version = \$version if (!ref $version);
 
-	return (
-		$$version =~ s/^(.*)[-_.](?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi
-			or $$version =~ s/^(.*)(?<=\d)(?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi
-	);
+	return 1 if ($$version =~
+	    s/^(.*)[\.\-\_](?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi);
+	return 1 if ($$version =~
+	    s/^(.*)(?<=\d)(?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi)
 }
 
 
@@ -506,29 +507,30 @@ sub vercompare
 	my @nums_old = split /\D+/, $old;
 
 	foreach my $n (0 .. $#nums_new) {
-		# New version component; all preceding
-		# components are equal, so assume newer.
+		# All preceding components are equal, so assume newer.
 		return 1 if (!defined($nums_old[$n]));
 
-		# Attempt to handle cases where version
-		# component lengths vary.
-		if (($n == $#nums_new) && (length $nums_new[$n] != length $nums_old[$n]))
+		# Attempt to handle cases where version component lengths vary.
+		if ($n == $#nums_new &&
+		    length $nums_new[$n] != length $nums_old[$n])
 		{
 			my $lendiff_thresh;
 
 			$lendiff_thresh =
-				($nums_new[$n] =~ /^0/ && $nums_old[$n] =~ /^0/)
-				? 1
-				: 2;
+			    ($nums_new[$n] =~ /^0/ && $nums_old[$n] =~ /^0/)
+			    ? 1
+			    : 2;
 
-			$nums_new[$n] = $nums_new[$n] . ('0' x length $1) if ($nums_old[$n] =~ /^(0+)/);
-			$nums_old[$n] = $nums_old[$n] . ('0' x length $1) if ($nums_new[$n] =~ /^(0+)/);
+			$nums_new[$n] = $nums_new[$n] . ('0' x length $1)
+			    if ($nums_old[$n] =~ /^(0+)/);
+			$nums_old[$n] = $nums_old[$n] . ('0' x length $1)
+			    if ($nums_new[$n] =~ /^(0+)/);
 
-			# Experimental code to catch (some) "backwards" version numbers
+			# Experimental, catch (some) "backwards" version numbers
 
 			my ($lendiff, $first_old, $first_new);
 
-			$lendiff   = length($nums_new[$n]) - length($nums_old[$n]);
+			$lendiff = length($nums_new[$n])-length($nums_old[$n]);
 			$first_new = substr($nums_new[$n], 0, 1);
 			$first_old = substr($nums_old[$n], 0, 1);
 
@@ -537,7 +539,8 @@ sub vercompare
 					return -1;
 				} elsif ($first_new == $first_old) {
 					$nums_old[$n] .= ('0' x $lendiff);
-					return ($nums_new[$n] > $nums_old[$n]) ? -1 : 0;
+					return ($nums_new[$n] > $nums_old[$n]
+					    ? -1 : 0);
 				} else {
 					return 0;
 				}
@@ -546,7 +549,8 @@ sub vercompare
 					return 0;
 				} elsif ($first_new == $first_old) {
 					$nums_new[$n] .= ('0' x abs $lendiff);
-					return ($nums_new[$n] < $nums_old[$n]) ? 0 : -1;
+					return ($nums_new[$n] < $nums_old[$n]
+					    ? 0 : -1);
 				} else {
 					return -1;
 				}
@@ -558,8 +562,7 @@ sub vercompare
 		return 0 if (0+$nums_new[$n] < 0+$nums_old[$n]);
 	}
 
-	# Handle versions like 1.0_suffix; strip away any hyphens or underbars,
-	# but only if they're between letters. That prevents mangling 1_0 vs 1_1.
+	# Handle versions like 1.0_suffix; strip away any hyphens or underbars.
 	$new =~ s/([-_]+[a-zA-Z]+)+$//;
 	$old =~ s/([-_]+[a-zA-Z]+)+$//;
 
@@ -594,14 +597,14 @@ sub betacompare
 		my $re   = $beta_types{$bt}->{re};
 		my $rank = $beta_types{$bt}->{rank};
 
-		if ($new =~ /[-_.](?:$re)(\d*(?:\.\d+)*)/i
-				or $new =~ /(?<=\d)(?:$re)(\d*(?:\.\d+)*)/i) {
+		if ($new =~ /[\.\-\_](?:$re)(\d*(?:\.\d+)*)/ ||
+		    $new =~ /(?<=\d)(?:$re)(\d*(?:\.\d+)*)/) {
 			$newrank = $rank;
 			$newnums = $1 if $1;
 		}
 
-		if ($old =~ /[-_.](?:$re)(\d*(?:\.\d+)*)/i
-				or $old =~ /(?<=\d)(?:$re)(\d*(?:\.\d+)*)/i) {
+		if ($old =~ /[\.\-\_](?:$re)(\d*(?:\.\d+)*)/ ||
+		    $old =~ /(?<=\d)(?:$re)(\d*(?:\.\d+)*)/) {
 			$oldrank = $rank;
 			$oldnums = $1 if $1;
 		}
@@ -908,33 +911,64 @@ sub wantport
 	return ($matched == $needed);
 }
 
+
+#------------------------------------------------------------------------------
+# Func: tobasepkgpath()
+# Desc: Remove flavors and/or subpackages from fullpkgpath.
+#
+# Args: $fullpkgpath - Package path for a specific port variation.
+#
+# Retn: $basepkgpath - Actual path to the package.
+#------------------------------------------------------------------------------
+
 sub tobasepkgpath
 {
-    my $fullpkgpath = shift;
-    my $basepkgpath = $fullpkgpath;
-    # Remove any flavors and/or subpackages.
-    $basepkgpath =~ s/,.*//g;
+	my $fullpkgpath = shift;
+	my $basepkgpath = $fullpkgpath;
+	# Remove any flavors and/or subpackages.
+	$basepkgpath =~ s/,.*//g;
 
-    return $basepkgpath;
+	return $basepkgpath;
 }
+
+
+#------------------------------------------------------------------------------
+# Func: fullpkgpathtoport()
+# Desc: Extract the port name excluding version specific subdir package.
+#
+# Args: $fullpkgpath - Package path for a specific port variation.
+#
+# Retn: $port        - Plausible name of the port based on its path.
+#------------------------------------------------------------------------------
 
 sub fullpkgpathtoport
 {
-    my $fullpkgpath = shift;
-    my $port = $fullpkgpath;
+	my $fullpkgpath = shift;
+	my $port = $fullpkgpath;
 
-    # Remove any versions, categories, flavors and subpackages.
-    $port =~ s/,.*//g;
-    $port =~ s/\/[\d\.]+(\/|$)/$1/g;
-    $port =~ s/.*\///g;
+	# Remove any versions, categories, flavors and subpackages.
+	$port =~ s/,.*//g;
+	$port =~ s/\/[\d\.]+(\/|$)/$1/g;
+	$port =~ s/.*\///g;
 
-    # Remove -V marker, either nameD or name/V or long-name-V.
-    # XXX devel/libsigc++-2
-    # XXX x11/kde-plasma/polkit-kde-agent-1
-    $port =~ s/^([^\-]+)\-\d+$/$1/;
+	# Remove -V marker, allow either nameD or name/V or long-name-V.
+	# ex: devel/libsigc++-2 -> libsigc++
+	# but: x11/kde-plasma/polkit-kde-agent-1 -> polkit-kde-agent-1
+	$port =~ s/^([^\-]+)\-\d+$/$1/;
 
-    return $port;
+	return $port;
 }
+
+
+#------------------------------------------------------------------------------
+# Func: primarycategory()
+# Desc: Find the longest category (most precise one) that match package path.
+#
+# Args: $categories - List of category separated by space.
+#       $path       - Package path in the port tree.
+#
+# Retn: $main_cat   - undef or the category path.
+#------------------------------------------------------------------------------
 
 sub primarycategory
 {
