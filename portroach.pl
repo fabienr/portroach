@@ -1167,91 +1167,97 @@ sub robotsallowed
 
 #------------------------------------------------------------------------------
 # Func: GenerateHTMLPorts()
-# Desc: Build web pages based on database data.
+# Desc: Build ports list web pages based on database data.
 #
-# Args: $sth      - Statement to fetch indexes
-#       $ssth     - Statement to fetch port data, given a specific index
+# Args: $sth      - Statement to fetch port data, given a specific page
+#       $page     - Specific page to generate
 #       \%outdata - Hash containing global template data
-#       $prefix   - Type of output, output into $prefix_$addr.html
+#       $prefix   - Type of output, output into $prefix_$page.html
 #
 # Retn: n/a
 #------------------------------------------------------------------------------
 
 sub GenerateHTMLPorts
 {
-	my ($sth, $ssth, $template, $outdata, $prefix) = @_;
-	my ($addr, $row, @results, $fh);
+	my ($sth, $page, $template, $outdata, $prefix) = @_;
+	my ($row, @results, $fh);
 
-	while ($addr = $sth->fetchrow_array)
-	{
-		$outdata->{index} = $addr;
+	$outdata->{index} = $page;
+	if ($prefix eq "maintainer") {
+		# cleanup maintainer email
 		$outdata->{index} =~ s/\>[\s\,]+([^\s])/\>& $1/g;
 		$outdata->{index} =~ s/\<.*?\>//g;
 		$outdata->{index} =~ s/\s+/ /g;
 		$outdata->{index} =~ s/\s$//g;
-		info(1, "$prefix\_$outdata->{index}");
+	}
+	info(1, "$prefix\_$outdata->{index}");
 
-		$ssth->execute($addr);
-		while ($row = $ssth->fetchrow_hashref) {
-			if ($row->{ignore}) {
-				$row->{method} = 'X';
-				$row->{newver} = '';
-				$row->{newurl} = '';
-			} else {
-				if ($row->{method} eq METHOD_LIST) {
-					$row->{method} = 'L';
-				} elsif ($row->{method} eq METHOD_GUESS) {
-					$row->{method} = 'G';
-				} elsif ($row->{method} eq METHOD_HANDLER) {
-					$row->{method} = 'S';
-				} else {
-					$row->{method} = '?';
-				}
-			}
+	if ($prefix eq "state") {
+		$sth->execute();
+	} else {
+		$sth->execute($page);
+	}
 
-			if ($row->{newver} && ($row->{ver} ne $row->{newver})) {
-				$row->{newdistfile} = 'updated';
+	while ($row = $sth->fetchrow_hashref) {
+		if ($row->{ignore}) {
+			$row->{method} = 'X';
+			$row->{newver} = '';
+			$row->{newurl} = '';
+		} else {
+			if ($row->{method} eq METHOD_LIST) {
+				$row->{method} = 'L';
+			} elsif ($row->{method} eq METHOD_GUESS) {
+				$row->{method} = 'G';
+			} elsif ($row->{method} eq METHOD_HANDLER) {
+				$row->{method} = 'S';
 			} else {
-				next if ($settings{hide_unchanged});
-				$row->{newdistfile} = '';
+				$row->{method} = '?';
 			}
-			$row->{updated} =~
-			    s/:\d\d(?:\.\d+)?$/ $settings{local_timezone}/;
-			$row->{checked} =~
-			    s/:\d\d(?:\.\d+)?$/ $settings{local_timezone}/;
-
-			if ($row->{homepage}) {
-				$row->{head} = "<a href=\"$row->{homepage}\">"
-				    . "$row->{basepkgpath}</a>";
-			} else {
-				$row->{head} = $row->{basepkgpath};
-			}
-			if ($row->{newurl}) {
-				$row->{new} = "<a href=\"$row->{newurl}\">"
-				    . "$row->{newver}</a>";
-			} else {
-				$row->{new} = $row->{newver};
-			}
-
-			$template->pushrow($row);
-			push(@results, $row);
 		}
 
-		$template->applyglobal(\%$outdata);
-		$outdata->{index} =~ tr|/|_|;
-		$outdata->{index} =~ tr| |_|;
-		$template->output("$prefix\_$outdata->{index}.html");
-		$template->reset;
+		if ($row->{newver} && ($row->{ver} ne $row->{newver})) {
+			$row->{newdistfile} = 'updated';
+		} else {
+			next if ($settings{hide_unchanged});
+			$row->{newdistfile} = '';
+		}
+		$row->{updated} =~
+			s/:\d\d(?:\.\d+)?$/ $settings{local_timezone}/;
+		$row->{checked} =~
+			s/:\d\d(?:\.\d+)?$/ $settings{local_timezone}/;
 
-		open($fh, '>', "$settings{html_data_dir}/json/"
-		    . "$prefix\_$outdata->{index}.json")
-		    or die "$prefix\_$outdata->{index}.json: $!";
-		print $fh JSON::encode_json(\@results);
-		close($fh);
-	
-		undef @results;
+		if ($row->{homepage}) {
+			$row->{head} = "<a href=\"$row->{homepage}\">"
+				. "$row->{basepkgpath}</a>";
+		} else {
+			$row->{head} = $row->{basepkgpath};
+		}
+		if ($row->{newurl}) {
+			$row->{new} = "<a href=\"$row->{newurl}\">"
+				. "$row->{newver}</a>";
+		} else {
+			$row->{new} = $row->{newver};
+		}
+
+		$template->pushrow($row);
+		push(@results, $row);
 	}
+
+	$template->applyglobal(\%$outdata);
+	$outdata->{index} =~ tr|/|_|;
+	$outdata->{index} =~ tr| |_|;
+	$template->output("$prefix\_$outdata->{index}.html");
+	$template->reset;
+
+	open($fh, '>', "$settings{html_data_dir}/json/"
+		. "$prefix\_$outdata->{index}.json")
+		or die "$prefix\_$outdata->{index}.json: $!";
+	print $fh JSON::encode_json(\@results);
+	close($fh);
+
+	undef @results;
 }
+
 
 #------------------------------------------------------------------------------
 # Func: GenerateHTML()
@@ -1265,7 +1271,7 @@ sub GenerateHTMLPorts
 sub GenerateHTML
 {
 	my (%sths, %outdata, %totals, @assets, @results, $dbh, $sth, $template,
-	    $row, $fh, $total, $outdated, $unknow, $maintainers);
+	    $page, $row, $fh, $total, $outdated, $unknow, $maintainers);
 
 	$dbh = connect_db();
 
@@ -1274,9 +1280,11 @@ sub GenerateHTML
 	    portdata_genmaintainers
 	    portdata_gensites
 	    portdata_selectall_cat
-	    portdata_selectall_site
+	    portdata_selectall_limited
 	    portdata_selectall_maintainer
-	    portdata_selectall_limited)
+	    portdata_selectall_outdated
+	    portdata_selectall_site
+	    portdata_selectall_unknow)
 	);
 
 	print "Organising results...\n";
@@ -1498,29 +1506,39 @@ sub GenerateHTML
 	$template = Portroach::Template->new('ports.html')
 	    or die "ports.html template not found!\n";
 
+	print "Creating state pages...\n";
+
+	GenerateHTMLPorts($sths{portdata_selectall_outdated}, "outdated",
+	    $template, \%outdata, "state");
+	GenerateHTMLPorts($sths{portdata_selectall_unknow}, "unknow",
+	    $template, \%outdata, "state");
+
 	print "Creating maintainer pages...\n";
 
 	$sth = $dbh->prepare('SELECT DISTINCT maintainer FROM maintainers')
 	    or die DBI->errstr;
 	$sth->execute;
-	GenerateHTMLPorts($sth, $sths{portdata_selectall_maintainer},
-	    $template, \%outdata, "maintainer");
+	GenerateHTMLPorts($sths{portdata_selectall_maintainer}, $page,
+	    $template, \%outdata, "maintainer")
+	    while ($page = $sth->fetchrow_array);
 
 	print "Creating category pages...\n";
 
 	$sth = $dbh->prepare('SELECT DISTINCT cat FROM categories')
 	    or die DBI->errstr;
 	$sth->execute;
-	GenerateHTMLPorts($sth, $sths{portdata_selectall_cat},
-	    $template, \%outdata, "cat");
+	GenerateHTMLPorts($sths{portdata_selectall_cat}, $page,
+	    $template, \%outdata, "cat")
+	    while ($page = $sth->fetchrow_array);
 
 	print "Creating site pages...\n";
 
 	$sth = $dbh->prepare('SELECT DISTINCT host FROM sites')
 	    or die DBI->errstr;
 	$sth->execute;
-	GenerateHTMLPorts($sth, $sths{portdata_selectall_site},
-	    $template, \%outdata, "site");
+	GenerateHTMLPorts($sths{portdata_selectall_site}, $page,
+	    $template, \%outdata, "site")
+	    while ($page = $sth->fetchrow_array);
 
 	# Cleanup & copy assets
 

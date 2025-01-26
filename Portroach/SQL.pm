@@ -272,22 +272,10 @@ $sql{portdata_uncheck} =
 
 #$sql{portdata_gensites}
 
-$sql{portdata_selectall_maintainer} =
-	q(SELECT *
-	    FROM portdata
-	   WHERE lower(maintainer) = lower(?)
-	ORDER BY cat,name);
-
 $sql{portdata_selectall_cat} =
 	q(SELECT *
 	    FROM portdata
 	   WHERE lower(cat) = lower(?)
-	ORDER BY cat,name);
-
-$sql{portdata_selectall_site} =
-	q(SELECT *
-	    FROM portdata
-	   WHERE lower(mastersites) LIKE '%' || (?) || '%'
 	ORDER BY cat,name);
 
 $sql{portdata_selectall_limited} =
@@ -297,6 +285,31 @@ $sql{portdata_selectall_limited} =
 	      OR ( limitwhich   is not NULL )
 	      OR ( indexsite    is not NULL )
 	      OR ( skipversions is not NULL )
+	ORDER BY cat,name);
+
+$sql{portdata_selectall_maintainer} =
+	q(SELECT *
+	    FROM portdata
+	   WHERE lower(maintainer) = lower(?)
+	ORDER BY cat,name);
+
+$sql{portdata_selectall_outdated} =
+	q(SELECT *
+	    FROM portdata
+	   WHERE newver IS NOT NULL
+	ORDER BY cat,name);
+
+$sql{portdata_selectall_site} =
+	q(SELECT *
+	    FROM portdata
+	   WHERE lower(mastersites) LIKE '%' || (?) || '%'
+	ORDER BY cat,name);
+
+$sql{portdata_selectall_unknow} =
+	q(SELECT *
+	    FROM portdata
+	   WHERE method IS NULL
+	      OR method = 0
 	ORDER BY cat,name);
 
 # ShowUpdates
