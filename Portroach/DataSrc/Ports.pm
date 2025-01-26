@@ -394,7 +394,7 @@ sub BuildPort
 			$ver = lc $ver;
 
 			debug(__PACKAGE__, $port, "trim .ext -> $ver")
-			    if ($ver =~ s/($ext_regex?)+$//);
+			    if ($ver =~ s/(\.($ext_regex))+$//);
 
 			# Remove names from pkgname/fullpkgpath, prefix & suffix
 			my @name_q;
