@@ -37,6 +37,7 @@ push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
 
 our %settings;
 
+my $github_re = qr/https?\:\/\/github\.com/;
 
 #------------------------------------------------------------------------------
 # Func: new()
@@ -74,9 +75,61 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /https?:\/\/github\.com\//);
+	return ($url =~ /^$github_re/);
 }
 
+
+#------------------------------------------------------------------------------
+# Func: GetName()
+# Desc: Return name or undef.
+#
+# Args: $url - A URL we want to extract name from.
+#
+# Retn: undef
+#------------------------------------------------------------------------------
+
+sub GetName
+{
+	my $self = shift;
+
+	my ($ver) = @_;
+
+	if ($ver =~ /$github_re\/(.*?)\/(archive|releases)\//) {
+		return $1;
+	} else {
+		return undef;
+	}
+}
+
+
+#------------------------------------------------------------------------------
+# Func: GetVersion()
+# Desc: Return version or undef.
+#
+# Args: $url - A URL we want to extract name from.
+#
+# Retn: undef
+#------------------------------------------------------------------------------
+
+sub GetVersion
+{
+	my $self = shift;
+
+	my ($ver) = @_;
+
+	my $projname = $self->GetName($ver);
+	return undef unless ($projname);
+
+	debug(__PACKAGE__, undef, "find $projname");
+	my ($account, $repo) = split('/', $projname);
+
+	return undef if (
+	    $ver !~ s:^$github_re/.*?/archive/refs/tags/(release/)?(.*)/.*?$:$2:
+	    && $ver !~ s:^$github_re/.*?/releases/download/(.*?)/.*$:$1:);
+	$ver =~ s/^($account|$repo)[\-\_]?//g;
+	$ver =~ s/\//\+/g;
+	return $ver;
+}
 
 #------------------------------------------------------------------------------
 # Func: GetFiles()
@@ -98,9 +151,9 @@ sub GetFiles
 	my ($url, $port, $files) = @_;
 	my (@tags, $projname, $query, $ua, $req, $resp, $json, $ver);
 
-	if ($url =~ /https?:\/\/github\.com\/(.*?)\/(archive|raw|releases)\//) {
+	if ($url =~ /$github_re\/(.*?)\/(archive|raw|releases)\//) {
 		$projname = $1;
-	} elsif ($url =~ /https?:\/\/github.com\/downloads\/(.*)\//) {
+	} elsif ($url =~ /$github_re\/downloads\/(.*)\//) {
 		$projname = $1;
 	}
 
@@ -200,12 +253,14 @@ sub GetFiles
 	foreach my $tag (@tags) {
 		my $ver = lc $tag;
 
-		debug(__PACKAGE__, $port, "repo -> $ver")
-		    if ($ver =~ s/^${repo}-//);
-		debug(__PACKAGE__, $port, "(v|r) prefix -> $ver")
+		debug(__PACKAGE__, $port, "trim projname -> $ver")
+		    if ($ver =~ s/^($account|$repo)[\-\_]?//);
+		debug(__PACKAGE__, $port, "trim (v|r) marker -> $ver")
 		    if ($ver =~ s/^$verprfx_regex//);
-		debug(__PACKAGE__, $port, "\\D[-._] -> $ver")
-		    if ($ver =~ s/^\D*[-\._]//);
+		debug(__PACKAGE__, $port, "trim \\D SEP -> $ver")
+		    if ($ver =~ s/^\D*[\.\-\_]//);
+		debug(__PACKAGE__, $port, "replace / by + -> $ver")
+		    if ($ver =~ s/\//\+/g);
 
 		debug(__PACKAGE__, $port, "tag $tag -> $ver")
 		    if ($tag ne $ver);
@@ -217,7 +272,7 @@ sub GetFiles
 
 		# XXX tmp fix, need graphql to order tag correclty
 		$tag = quotemeta $port->{ver};
-		last if ($ver =~ /$tag/i);
+		last if ($ver =~ /$tag/);
 	}
 
 	return 1;
