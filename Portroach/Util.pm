@@ -1295,7 +1295,7 @@ sub restrict2regex
 
 	if (scalar @items) {
 		my $list = join '|', @items;
-		return qr/^(?:$list)$/i;
+		return qr/^(?:$list)(\-.*)?$/i;
 	} else {
 		return undef;
 	}
