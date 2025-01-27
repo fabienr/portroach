@@ -315,7 +315,7 @@ sub nametoregex
 	my $name = shift;
 	my $regex;
 
-	return lc $name if ($name =~ /^$lang_regex$/i);
+	return lc $name if ($name =~ /^($lang_regex|g)$/i);
 
 	if ($name =~ /\//) {
 		foreach my $subname (split /\//, $name) {
@@ -330,12 +330,15 @@ sub nametoregex
 	$regex =~ s/[\.\-\_]/.?/g;
 	$regex =~ s/^($lang_regex)/(?:$1)?\[\\-\\_\]?/i;
 	$regex =~ s/^g/(?:g)?/i; # note, G for gnu ports: gtar -> tar
+	# debug(__PACKAGE__, undef, "$name -> $regex");
 
-	return $regex unless ($name =~ /\-|\+|\d|[A-Z]/);
+	return $regex unless ($name =~ /\-|\_|\+|\d|[A-Z]/);
 
 	my @names;
 	@names = (@names, split(/\-/, $name))
 		if (!@names && $name =~ /\-/);
+	@names = (@names, split(/\_/, $name))
+		if (!@names && $name =~ /\_/);
 	@names = (@names, split(/\+/, $name))
 		if (!@names && $name =~ /\+/);
 	@names = (@names, split(/\d+/, $name))
@@ -345,6 +348,7 @@ sub nametoregex
 	return $regex unless (scalar @names > 1);
 
 	foreach my $subname (@names) {
+		# debug(__PACKAGE__, undef, "subname $subname");
 		# skip if empty (consecutive delimiter)
 		next unless ($subname);
 		if ($subname eq "p5") {
@@ -355,7 +359,7 @@ sub nametoregex
 			$regex .= '|python';
 			next;
 		}
-		next if ($subname =~ /^$lang_regex$/);
+		next if ($subname =~ /^$lang_regex|g$/i);
 		next if (length $subname == 1);
 
 		my $q = nametoregex($subname);
