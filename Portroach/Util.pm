@@ -774,12 +774,13 @@ sub extractfilenames
 	$sufx = quotemeta $sufx;
 
 	foreach (split "<", $data) {
-		while (/^a\s+href\s*=\s*(['"])([^<>\s]*$sufx?)\1/gi) {
-			my $file = uri_unescape($2);
-			debug(__PACKAGE__, undef, "unescape $2 -> $file")
-			    if ($file ne $2);
-			push @$files, $file;
-		}
+		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/);
+		my $link = $2;
+		next unless $link =~ /$sufx$/;
+		my $file = uri_unescape($link);
+		debug(__PACKAGE__, undef, "unescape $link -> $file")
+		    if ($file ne $link);
+		push @$files, $file;
 	}
 
 	return 1;
@@ -801,9 +802,10 @@ sub extractdirectories
 	my ($data, $dirs) = @_;
 
 	foreach (split "<", $data) {
-		if (/^a\s+href\s*=\s*('|")(.*\/$verlike_regex\/(.*\/)?)\1/gi) {
-			push @$dirs, $2;
-		}
+		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/);
+		my $link = $2;
+		next unless $link =~ /$verlike_regex/;
+		push @$dirs, $link;
 	}
 
 	return 1;
@@ -829,19 +831,18 @@ sub extractsubdirectories
 	my $path_q = quotemeta $site->path;
 
 	foreach (split "<", $data) {
-		if (/^a\s+href\s*=\s*('|")(.*\/)\1/gi) {
-			my $guess = $2;
-			# check same host, extract actual path
-			# XXX check type also ?
-			if ($guess =~ /^.*?:\/\//) {
-				next if ($guess !~ /^.*?:\/\/$host_q\//);
-				$guess =~ s/^.*?:\/\/$host_q\//\//;
-			}
-			$guess = $site->path.$guess if ($guess !~ /^\//);
-			$guess = path_absolute($guess);
-			next if ($guess !~ /^$path_q[^\/]+/);
-			push @$dirs, $guess;
+		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/);
+		my $link = $2;
+		# check same host, extract actual path
+		# XXX check type also ?
+		if ($link =~ /^.*?:\/\//) {
+			next if ($link !~ /^.*?:\/\/$host_q\//);
+			$link =~ s/^.*?:\/\/$host_q\//\//;
 		}
+		$link = $site->path.$link if ($link !~ /^\//);
+		$link = path_absolute($link);
+		next if ($link !~ /^$path_q[^\/]+/);
+		push @$dirs, $link;
 	}
 
 	return 1;
