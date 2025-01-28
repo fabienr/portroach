@@ -83,7 +83,8 @@ sub GetFiles
 
 	my ($url, $port, $files, $path_ver) = @_;
 
-	my ($ua, $resp, @dirs, $path, $dir, @tmp);
+	my ($ua, $resp, $host, $link, @dirs, $dir, @tmp, $site, $path,
+	    $path_ver_q, $root_content);
 
 	# A 404 here ought to imply that the distfile
 	# is unavailable, since we expect it to be
@@ -93,13 +94,19 @@ sub GetFiles
 
 	$ua = lwp_useragent();
 	$resp = $ua->get($url);
+	$host = $url->host;
+	$host = s/.*\.([^\.]*?\.[^\.])$/$1/; # check only for top domain
 
 	if ($resp->is_success) {
 		my @tmp;
 		extractfilenames($resp->content, $port->{sufx}, \@tmp);
-		foreach (@tmp) {
-			debug(__PACKAGE__, $port, "push $_");
-			push @$files, $_;
+		foreach $link (@tmp) {
+			if ($link =~ /^https?:\/\// && $link !~ /$host/) {
+				debug(__PACKAGE__,$port,"skip $link !~ $host");
+				next;
+			}
+			debug(__PACKAGE__, $port, "push $link");
+			push @$files, $link;
 		}
 		info(1, $port->{fullpkgpath}, $url->host,
 		    "no link mathing $port->{sufx}")
@@ -110,21 +117,26 @@ sub GetFiles
 		return 0;
 	}
 
-	return 1 unless($path_ver);
+	# XXX indexsite from Makefile may prevent path_ver detection
+	# return 1 unless($path_ver);
 
-	# Directory listing a success: we can
-	# investigate $path_ver variations...
+	# Directory listing is a success: investigate $path_ver variations...
 
-	# Visit parent directory
-
-	my $site = $url->clone;
-	uri_lastdir($site, undef);
+	$site = $url->clone;
 	$path = $site->path;
+	if ($path_ver) {
+		$path_ver_q = quotemeta $path_ver;
+		$path =~ s/$path_ver_q\/.*//;
+		$site->path($path);
+		debug(__PACKAGE__, $port, "switch to $path");
+	}
 
 	$resp = $ua->get($site);
 
 	if ($resp->is_success) {
-		extractdirectories($resp->content, \@dirs);
+		$root_content = $resp->content;
+		extractdirectories($root_content, \@dirs);
+		debug(__PACKAGE__, $port, "no dirs, $site") if (!@dirs);
 	} else {
 		# As we previously got an answer, this is not a failure
 		info(1, $port->{fullpkgpath}, strchop($site, 60)
@@ -133,27 +145,110 @@ sub GetFiles
 		return 1; # success
 	}
 
-	# Investigate sibling version dirs
+	# Investigate sibling version matches
+	my $found = 0;
 	foreach $dir (@dirs) {
-		my @tmp;
-		next unless ($dir =~ /^(?:\d+\.)+\d+$/ ||
-		    $dir =~ /$date_regex/i);
+		last unless $path_ver_q; # skip without version
+		my (@tmp, $dir_v, $new_path);
 
-		$site->path("$path$dir");
+		# Check version, filter bad matches early
+		$dir_v = $dir;
+		$dir_v =~ s:(.*/)?($verlike_regex)/.*:$2:i;
+		if (!isversion($dir_v, $port->{ver})) {
+			debug(__PACKAGE__, $port, "$dir_v !~ $port->{ver}, "
+			    . "skip dir $dir");
+			next;
+		} elsif (!vercompare($dir_v, $port->{ver})) {
+			debug(__PACKAGE__, $port, "$dir_v < $port->{ver}, "
+			    . "skip dir $dir");
+			next;
+		}
+
+		# Check same site with alternative path
+		$new_path = $url->path;
+		$new_path =~ s/$path_ver_q/$dir_v/;
+		$site->path($new_path);
+
 		$resp = $ua->get($site);
-		if (!$resp->is_success) {
+		if ($resp->is_success) {
+			extractfilenames($resp->content, $port->{sufx}, \@tmp);
+			debug(__PACKAGE__, $port, "no files, $site") if (!@tmp);
+		} else {
+			# As we previously got an answer, this is not a failure
+			info(1, $port->{fullpkgpath}, strchop($site, 60)
+			    . ': ' . $resp->status_line);
+		}
+		foreach my $link (@tmp) {
+			if ($link =~ /^https?:\/\// && $link !~ /$host/) {
+				debug(__PACKAGE__,$port,"skip $link !~ $host");
+				next;
+			} elsif ($link !~ /^(https?:\/\/|\/)/) {
+				$link = $site->path . "$link";
+			}
+			debug(__PACKAGE__, $port, "push $link");
+			$found = 1;
+			push @$files, "$link";
+		}
+	}
+
+	return 1 if($found);
+
+	# No files found, crawl sibling version dirs, use as last solution
+	undef @dirs;
+
+	$site->path($path);
+	extractsubdirectories($root_content, \@dirs, $site);
+	debug(__PACKAGE__, $port, "no subdir, $site") if (!@dirs);
+
+	while ($dir = shift(@dirs)) {
+		my (@tmp, $dir_v, $new_path);
+
+		# Check version, filter bad matches early
+		$dir_v = $dir;
+		$dir_v =~ s:.*/($verlike_regex)/.*:$1:i;
+		if (!isversion($dir_v, $port->{ver})) {
+			debug(__PACKAGE__, $port, "$dir_v !~ $port->{ver}, "
+			    . "skip dir $dir");
+			next;
+		} elsif (!vercompare($dir_v, $port->{ver})) {
+			debug(__PACKAGE__, $port, "$dir_v < $port->{ver}, "
+			    . "skip dir $dir");
+			next;
+		}
+
+		$site->path($dir);
+		$resp = $ua->get($site);
+		if ($resp->is_success) {
+			extractfilenames($resp->content, $port->{sufx}, \@tmp);
+			debug(__PACKAGE__, $port, "no files, $site") if (!@tmp);
+		} else {
 			# As we previously got an answer, this is not a failure
 			info(1, $port->{fullpkgpath}, strchop($site, 60)
 			    . ': ' . $resp->status_line);
 			next;
 		}
 
-		extractfilenames($resp->content, $port->{sufx}, \@tmp);
-		foreach (@tmp) {
-			debug(__PACKAGE__, $port, "push $path$dir/$_");
-			push @$files, "$path$dir/$_";
+		foreach my $link (@tmp) {
+			if ($link =~ /^https?:\/\// && $link !~ /$host/) {
+				debug(__PACKAGE__,$port,"skip $link !~ $host");
+				next;
+			} elsif ($link !~ /^(https?:\/\/|\/)/) {
+				$link = $site->path . "/$link";
+			}
+			debug(__PACKAGE__, $port, "push $link");
+			push @$files, "$link";
+		}
+		next unless (!@tmp);
+
+		# Still no link found, continue crawling ...
+		extractsubdirectories($resp->content, \@tmp, $site);
+		debug(__PACKAGE__, $port, "no subdir, $site") if (!@tmp);
+		foreach my $link (@tmp) {
+			debug(__PACKAGE__, $port, "DIR $link");
+			push @dirs, "$link";
 		}
 	}
+
 	return 1;
 }
 
