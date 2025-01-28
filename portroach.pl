@@ -794,17 +794,16 @@ sub FindNewestFile
 	my ($poss_match, $poss_url, $old_found, $new_found);
 
 	my $distfile = $port->{distfiles};
-	my $distfile_q = $distfile;
-	my $old_v = $port->{ver};
-	if ($distfile_q =~
-	    s/^(.*)(?:$verprfx_regex?)*\Q$old_v\E(.*)$/$1##v##$2/i) {
-		$distfile_q = nametoregex($distfile_q);
+	my $distfile_q = lc $distfile;
+	my $old_vq = vertoregex($port->{ver});# lazy version separator X.Y ~ XY
+	if ($distfile_q =~ s/^(.*)(?:$verprfx_regex?)*$old_vq(.*)$/$1##v##$2/) {
+		$distfile_q = vertoregex($distfile_q);
 		$distfile_q =~ s/##v##/(?:$verprfx_regex)?(\\d.*?)/;
 		debug(__PACKAGE__, $port, "distfile regex query, "
 		    . "$distfile -> $distfile_q");
 	} else {
 		debug(__PACKAGE__, $port, "invalid distfile $distfile, "
-		    . "version ($verprfx_regex)?$old_v not found.");
+		    . "version ($verprfx_regex)?$old_vq not found.");
 		$distfile_q = undef;
 	}
 
@@ -836,7 +835,7 @@ sub FindNewestFile
 		my $skip = 0;
 		foreach (@bad_versions) {
 			last if (!$settings{freebsdhacks_enable});
-			next unless ($file =~ /$_/i && $distfile !~ /$_/i);
+			next unless ($file =~ /$_/ && $distfile !~ /$_/);
 			debug(__PACKAGE__, $port, "skip $file, bad $_");
 			$skip = 1;
 			last;
@@ -857,8 +856,17 @@ sub FindNewestFile
 				next;
 			}
 
+			# Fallback on file if tag was too complex for handler
+			unless (isversion($new_v, $old_v)) {
+				debug(__PACKAGE__, $port, "fallback on "
+				    . "file $file, isversion $old_v");
+				undef $new_v;
+			}
+		}
+
 		# Version extraction from filename
-		} elsif ($distfile_q && $file =~ /^($distfile_q)$/i && $2) {
+		if ($distfile_q && !$new_v &&
+		    $file =~ /^($distfile_q)$/i && $2) {
 			my $ver = $2;
 			debug(__PACKAGE__, $port, "new file ? $file");
 			$new_v = lc $ver;
@@ -872,17 +880,47 @@ sub FindNewestFile
 
 			debug(__PACKAGE__, $port,
 			    "file $file =~ $distfile && $ver -> $new_v");
-		} else {
+		} elsif (!$new_v) {
 			debug(__PACKAGE__, $port,
 			    "discard, file $file !~ $distfile ($distfile_q)");
 			next;
 		}
 
+		# XXX same distfile / version extraction from path ?
+
+		# Normalize \d [-_] \d into \d.\d
+		debug(__PACKAGE__, $port, "normalize new_v -> $new_v")
+		    if ($new_v =~ s/(?<=\d)[\-\_](?=\d)/\./g);
+
 		# Check both version looks the same and are valid
-		unless (isversion($old_v, $new_v)) {
-			debug(__PACKAGE__, $port,
-			    "skip, invalid version $new_v !~ $old_v");
-			next;
+		unless (isversion($new_v, $old_v)) {
+
+			# Detect if version was collapsed into a shorter format
+			my $short_v = $old_v;
+			$short_v =~ s/[\.\-\_]//g;
+			unless (isversion($new_v, $short_v)) {
+				debug(__PACKAGE__, $port,
+				    "skip, invalid version $new_v !~ $old_v");
+				next;
+			}
+			unless (length($short_v) <= length($new_v)) {
+				debug(__PACKAGE__, $port,
+				    "skip, length missmatch $new_v < $short_v");
+				next;
+			}
+			debug(__PACKAGE__, $port, "shorter version "
+			    . "$old_v -> $short_v ~ $new_v");
+
+			# Rebuild proper version from the short string
+			my $long_v;
+			$short_v = $old_v;
+			while ($short_v =~ s/([^\.\-\_]+)([\.\-\_]|$)//) {
+				$long_v .= substr($new_v, 0, length($1)).$2;
+				$new_v = substr($new_v, length($1));
+			}
+			$long_v .= $new_v;
+			debug(__PACKAGE__, $port, "rebuilt version -> $long_v");
+			$new_v = $long_v;
 		}
 
 		debug(__PACKAGE__, $port, "new_v ${new_v}, "
@@ -898,19 +936,21 @@ sub FindNewestFile
 		}
 		next if ($skip);
 
+		# Skip silly str (x.y-sillyv) if oldv !~ sillyv (except beta)
+		# XXX not that usefull afterall ?
 		unless ($settings{sillystrings_enable}) {
-			if ($new_v =~ /[-_.]([A-Za-z]+[A-Za-z_-]{2,})$/) {
+			if ($new_v =~ /[\.\-\_]([A-Za-z]+[A-Za-z_-]{2,})$/) {
 				my $str = $1;
 				debug(__PACKAGE__,$port,"sillystrings $new_v");
-				if ($old_v !~ /[-_.]$str$/ && (
-				    $str !~ /^($beta_regex)$/i ||
+				if ($old_v !~ /[\.\-\_]$str$/ && (
+				    $str !~ /^($beta_regex)$/ ||
 				    length $1 < length $str) # short RE match
 				) {
 					debug(__PACKAGE__, $port,
-					    "$old_v !~ [-_.]str");
+					    "$old_v !~ [\.\-\_]str");
 					debug(__PACKAGE__, $port,
 					    "$str !~ beta_regex")
-					    if ($str !~ /^($beta_regex)$/i);
+					    if ($str !~ /^($beta_regex)$/);
 					debug(__PACKAGE__, $port,
 					    "length $1 < length $str")
 					    if (length $1 < length $str);
