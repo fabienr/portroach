@@ -531,30 +531,19 @@ sub VersionCheck
 
 		# Look to see if the URL contains the distfile version.
 		# This will affect our checks and guesses later on.
-		if ($port->{ver} =~ /^(?:\d+\.)+\d+$/
-		    or $port->{ver} =~ /$date_regex/) {
-			my ($lastdir, $majver);
-
-			$lastdir = uri_lastdir($site);
-
-			# Also check version sans last number if >= 3 numbers
-			# In other words, the "major" version.
-			# This could be emulated for date strings, but it
-			# gets a bit messy deciphering that format.
-			if ($port->{ver} =~ /^(?:\d+\.){2,}\d+$/) {
-				$majver = $port->{ver};
-				$majver =~ s/\.\d+$//;
-			}
-
-			# Look for a match
-			if ($lastdir eq $port->{ver}) {
-				# Last directory = current version
-				$path_ver = $lastdir;
-			} elsif ($majver && $lastdir eq $majver) {
-				# Last directory = current major version
-				$path_ver = $lastdir;
+		if ($site =~ m:^.*/($verlike_regex)/.*$:) {
+			my $dir_ver = $1;
+			my $dir_ver_q = vertoregex($dir_ver);
+			debug(__PACKAGE__, $port, "port_ver $port->{ver}, "
+			    . "dir_ver $dir_ver, regex $dir_ver_q");
+			if ($dir_ver eq $port->{ver}) {
+				$path_ver = $dir_ver;
+			} elsif ($port->{ver} =~ /^$dir_ver_q/) {
+				$path_ver = $dir_ver;
 			}
 		}
+		debug(__PACKAGE__, $port, "path version $path_ver")
+		    if ($path_ver);
 
 		# Check for special handler for this site first
 		if ($sh = Portroach::SiteHandler->FindHandler($site)) {
