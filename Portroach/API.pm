@@ -34,6 +34,7 @@ use Portroach::Config;
 require Exporter;
 
 use Data::Dumper;
+use Try::Tiny;
 
 use strict;
 
@@ -174,7 +175,7 @@ sub AddPort
 	if ($oldport)
 	{
 		my $regress;
-		my $samedist = ($port->{distname} eq $oldport->{distname});
+		my $sameport = ($port->{name} eq $oldport->{name});
 		my $samever = ($port->{ver} eq $oldport->{ver});
 
 		if ($samever) {
@@ -183,18 +184,17 @@ sub AddPort
 			$rc = 3; # return code 3 means version change
 		}
 
-		# Regress on unwanted changes (same distname)
-		# XXX ideally s/distname/pkgname/, not yet in DB
+		# Regress on unwanted changes (same name, aka fullpkgname)
 		foreach my $v ("ver", "name", "cat", "sufx") {
-			last if (!$samedist);
+			last if (!$sameport);
 			next unless ($port->{$v} ne $oldport->{$v});
-			regress($port->{fullpkgpath}, "same distname, $v "
+			regress($port->{fullpkgpath}, "same pkg, $v "
 			    . "$oldport->{$v} -> $port->{$v}");
 			$regress = 1 if (!$settings{regress});
 		}
 
 		# Regress on version decrease
-		if (!$samedist && !$samever &&
+		if (!$sameport && !$samever &&
 		    vercompare($port->{ver}, $oldport->{ver}) != 1) {
 			regress($port->{fullpkgpath}, "version decrease, "
 			    . "$oldport->{ver} -> $port->{ver}");
@@ -202,7 +202,7 @@ sub AddPort
 		}
 
 		# Clear newver if version & port changed
-		if (!$samedist && !$samever) {
+		if (!$sameport && !$samever) {
 			$sths->{portdata_clearnewver}->execute(
 			    $port->{fullpkgpath}
 			) unless ($settings{precious_data} || $regress);
@@ -263,7 +263,7 @@ sub AddPort
 	foreach my $var (keys %{$port->{options}}) {
 		my $val = $port->{options}->{$var};
 
-		if ($var !~ /^[A-Za-z]+$/i) {
+		if ($var !~ /^[A-Za-z]+$/) {
 			print STDERR "$port->{fullpkgpath}: "
 			    . "invalid portconfig tuple ($var)\n";
 			next;
@@ -354,9 +354,6 @@ sub AddPort
 		$pcfg{ignore}, $port->{fullpkgpath}
 	) if (!$settings{precious_data});
 
-	# Ensure indexsite is added to sitedata
-	push @{$port->{sites}}, $pcfg{indexsite} if ($pcfg{indexsite});
-
 	$sths->{portdata_getnewver}->execute($port->{fullpkgpath});
 	($newver) = $sths->{portdata_getnewver}->fetchrow_array;
 
@@ -398,9 +395,13 @@ sub AddPort
 
 	# Sites
 
+	# Add indexsite and homepage to sitedata
+	push @{$port->{sites}}, $pcfg{indexsite} if ($pcfg{indexsite});
+	push @{$port->{sites}}, $port->{homepage} if ($port->{homepage});
+
 	if (@{$port->{sites}}) {
 		# Add master site hosts to database
-		$self->AddSite($_) foreach (@{$port->{sites}});
+		$self->AddSite($port, $_) foreach (@{$port->{sites}});
 	}
 
 	return $rc;
@@ -419,21 +420,34 @@ sub AddPort
 sub AddSite
 {
 	my ($self) = shift;
-	my ($site) = @_;
+	my ($port, $site) = @_;
 
 	my $dbh  = $self->{dbh};
 	my $sths = $self->{sths};
 
 	my $exists;
 
-	$site = URI->new($site) if (!ref $site);
+	try {
+		$site = URI->new($site)->canonical;
+		if (length $site->host == 0) {
+			print STDERR "$port->{fullpkgpath}: "
+			    . "empty host $site\n";
+			return;
+		}
+	} catch {
+		print STDERR "$port->{fullpkgpath}: "
+		    . "caught error on $site\n";
+		debug(__PACKAGE__, $port, "$_");
+		return;
+	};
 
 	$sths->{sitedata_exists}->execute($site->host);
 	($exists) = $sths->{sitedata_exists}->fetchrow_array;
 
 	if (!$exists && !$settings{precious_data}) {
 		$sths->{sitedata_insert}->execute($site->scheme, $site->host)
-		    or die "Failed to add new site: $DBI::errstr";
+		    or die "$port->{fullpkgpath}: Failed to add new site: "
+		    . "$DBI::errstr";
 	}
 }
 

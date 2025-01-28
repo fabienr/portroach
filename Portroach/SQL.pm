@@ -79,7 +79,7 @@ $sql{portdata_update} =
 
 # Port.pm:BuildPort()
 
-# order by make sure shorter (main) fullpkgpath come first
+# order by fullpkgpath, make sure shorter (main) path come first
 $sql{create_view} = q(CREATE TEMP VIEW RoachData AS
 	SELECT
 	    FullPkgPath as fullpkgpath,
@@ -93,14 +93,14 @@ $sql{create_view} = q(CREATE TEMP VIEW RoachData AS
 	    PORTROACH as portroach,
 	    PORTROACH_COMMENT as portroach_comment,
 	    HOMEPAGE as homepage,
-	    PKGNAME as pkgname
+	    FULLPKGNAME as fullpkgname
 	FROM portsq
 	ORDER BY fullpkgpath);
 
 $sql{ports_select} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-	     portroach_comment, homepage, pkgname
+	     portroach_comment, homepage, fullpkgname
         FROM RoachData);
 
 $sql{ports_select_count} =
@@ -110,7 +110,7 @@ $sql{ports_select_count} =
 $sql{ports_restrict_maintainer} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage, pkgname
+             portroach_comment, homepage, fullpkgname
         FROM RoachData
        WHERE maintainer like ?);
 
@@ -122,7 +122,7 @@ $sql{ports_restrict_maintainer_count} =
 $sql{ports_restrict_category} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage, pkgname
+             portroach_comment, homepage, fullpkgname
         FROM RoachData
        WHERE categories like ?);
 
@@ -134,7 +134,7 @@ $sql{ports_restrict_category_count} =
 $sql{ports_restrict_port} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage, pkgname
+             portroach_comment, homepage, fullpkgname
         FROM RoachData
        WHERE fullpkgpath like ?);
 

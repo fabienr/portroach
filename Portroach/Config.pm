@@ -64,6 +64,8 @@ my (@paths, %settings_types, $bool_opts);
 	datasrc			=> 'Portroach::DataSrc::Ports',
 	datasrc_opts		=> '',
 
+	build_chop		=> '',
+
 	regress			=> 0,	# Don't override database on regression
 	precious_data		=> 0,	# Don't write anything to database
 	num_children		=> 15,	# Number of child processes to spawn

@@ -78,6 +78,40 @@ hide unchanged =	false	# Show ports with no updates.
 
 #-- Other Settings ------------------------------------------------------------
 
+# Most common word to trim from any distfile, as a regular expression
+build chop = all|bin|fonts|linux|release|sdk|source|src|stable|unix|esp
+
+# Extra words specific to some ports
+build chop+= |pa				# audio/portaudio-svn
+build chop+= |free				# books/AsteriskGuide
+build chop+= |qet				# cad/qelectrotech
+build chop+= |jdk8u				# devel/jdk/1.8
+build chop+= |prosody				# devel/luaevent
+build chop+= |pkg\-config			# devel/metaauto
+build chop+= |x11				# fonts/jmk-fonts  
+build chop+= |build				# games/0ad
+build chop+= |amphetamine\-data			# games/amph
+build chop+= |doom				# games/doomdata
+build chop+= |3dduke				# games/duke3ddata
+build chop+= |4stattack				# games/forcedattack
+build chop+= |s25client				# games/returntotheroots
+build chop+= |t\-engine4			# games/tome4
+build chop+= |hexen2				# games/uhexen2
+build chop+= |quake				# games/yquake2
+build chop+= |gs				# graphics/jbig2dec
+build chop+= |configtool			# inputmethods/fcitx-config-qt
+build chop+= |eaglebinarymonoonunix		# lang/eagle
+build chop+= |meet				# net/jitsi/jicofo
+build chop+= |fig2dev				# print/transfig
+build chop+= |docker				# telephony/coturn
+build chop+= |docbk				# textproc/docbook
+build chop+= |swish\-e				# textproc/p5-SWISH-API
+build chop+= |g72(?:x|\d)			# telephony/asterisk-g729
+build chop+= |swish\-e				# textproc/p5-SWISH-API
+build chop+= |languages				# www/phpmyadmin
+build chop+= |e16				# x11/enlightenment
+build chop+= |qt3d				# x11/qt5/docs
+
 #verbose =		true	# Enable verbose mode (--verbose)
 #debug =		true	# Enable debug mode (--debug)
 
