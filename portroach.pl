@@ -956,7 +956,12 @@ sub FindNewestFile
 				   "skip $new_v =~ /$port->{limitver}/");
 				next;
 			}
-		} elsif ($port->{name} =~ /^(.*\D)(\d{1,3})(?:[-_]\D+)?$/) {
+
+		} elsif (
+		    (fullpkgpathtoport($port->{basepkgpath}) =~
+		    /^(.*\D)(\d{1,3})(?:[\-\_]\D+)?$/) ||
+		    (fullpkgpathtosubcat($port->{basepkgpath}) =~
+		    /^(.*\D)(\d{1,3})(?:[\-\_]\D+)?$/)) {
 			my $nm_nums = $2;
 			my $vr_nums = $new_v;
 			my $vo_nums = $old_v;
@@ -964,9 +969,9 @@ sub FindNewestFile
 			debug(__PACKAGE__, $port, "prefix $1 nm_nums $nm_nums");
 
 			unless (($1.$2) =~
-			    /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/i) {
+			    /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/) {
 				my $fullver = '';
-				while ($vo_nums =~ s/^(\d+?)[-_\.]?//) {
+				while ($vo_nums =~ s/^(\d+?)[\.\-\_]?//) {
 					$fullver .= $1;
 					last if ($fullver eq $nm_nums);
 				}
@@ -974,7 +979,7 @@ sub FindNewestFile
 				if ($fullver eq $nm_nums) {
 					debug(__PACKAGE__, $port,
 					   "fullver $fullver nm_nums $nm_nums");
-					$vr_nums =~ s/[-_\.]//g;
+					$vr_nums =~ s/[\.\-\_]//g;
 					unless ($vr_nums =~ /^$nm_nums/) {
 						debug(__PACKAGE__, $port,
 						    "skip $vr_nums ~ $nm_nums");
