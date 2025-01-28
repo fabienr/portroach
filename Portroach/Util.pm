@@ -605,10 +605,14 @@ sub vercompare
 	my @nums_new = split /\D+/, $new;
 	my @nums_old = split /\D+/, $old;
 
-	# Make sure x.y.z is newer dans xxxxx
-	return 0 if ($#nums_new == 1 && $#nums_old > 1);
+	# Make sure x.y.z is newer then xxxxx
+	# debug(__PACKAGE__, undef, "vercompare "
+	#     . "$new ($#nums_new) vs $old ($#nums_old)");
+	return 0 if ($#nums_new == 0 && $#nums_old > 0);
 
 	foreach my $n (0 .. $#nums_new) {
+		# debug(__PACKAGE__, undef, "vercompare "
+		#     . $nums_new[$n]." / ".$nums_old[$n]);
 		# All preceding components are equal, so assume newer.
 		return 1 if (!defined($nums_old[$n]));
 
@@ -660,6 +664,8 @@ sub vercompare
 		}
 
 		# Otherwise, compare values numerically
+		# debug(__PACKAGE__, undef, "vercompare "
+		#     . 0+$nums_new[$n]." <> ".0+$nums_old[$n]);
 		return 1 if (0+$nums_new[$n] > 0+$nums_old[$n]);
 		return 0 if (0+$nums_new[$n] < 0+$nums_old[$n]);
 	}
