@@ -471,26 +471,30 @@ sub VersionCheck
 {
 	my ($dbh, $sths, $port) = @_;
 
-	my ($found, $k, $i, @handlers);
+	my (@sites, @handlers, $found, $k, $i);
 
 	$found = 0;
 	$k = $port->{fullpkgpath};
 	$i = 0;
-
-	# Override MASTER_SITES if requested
-	if ($port->{indexsite}) {
-		info(1, $k,"Using indexsite instead of mastersite ".
-		    "$port->{mastersites} -> $port->{indexsite}");
-		$port->{mastersites} = $port->{indexsite};
-	}
 
 	# XXX s/distfiles/distfile/
 	return if (!$port->{distfiles} || !$port->{mastersites});
 
 	info(1, $k, 'VersionCheck()');
 
+	# Prepare sites to inspect: indexsite, homepage(*), mastersites
+	# (*) inspect homepage only if handled by a SiteHandler
+	@sites = split(' ', $port->{mastersites});
+	if (Portroach::SiteHandler->FindHandler($port->{homepage})) {
+		unshift @sites, $port->{homepage};
+	}
+	if ($port->{indexsite}) {
+		info(1, $k,"indexsite, $port->{indexsite} before mastersite");
+		unshift @sites, $port->{indexsite};
+	}
+
 	# Loop through master sites
-	foreach my $site (split ' ', $port->{mastersites})
+	foreach my $site (@sites)
 	{
 		my (@files, @dates, $host, $sitedata, $method, $path_ver, $sh,
 		    $new_found, $old_found, $file);
