@@ -92,9 +92,11 @@ sub GetName
 {
 	my $self = shift;
 
-	my ($ver) = @_;
+	my ($url) = @_;
 
-	if ($ver =~ /$github_re\/(.*?)\/(archive|releases)\//) {
+	if ($url =~ /^$github_re\/([^\/]+)\/([^\/]+)\//) {
+		return "$1/$2";
+	} elsif ($url =~ /^$github_re\/downloads\/(.*)\//) {
 		return $1;
 	} else {
 		return undef;
@@ -151,14 +153,8 @@ sub GetFiles
 	my ($url, $port, $files) = @_;
 	my (@tags, $projname, $query, $ua, $req, $resp, $json, $ver);
 
-	if ($url =~ /$github_re\/(.*?)\/(archive|raw|releases)\//) {
-		$projname = $1;
-	} elsif ($url =~ /$github_re\/downloads\/(.*)\//) {
-		$projname = $1;
-	}
-
 	# XXX check if $projname =~ /.*?\/(.*)/ ?
-
+	$projname = $self->GetName($url);
 	unless ($projname) {
 		print STDERR "$port->{fullpkgpath}: $url, "
 		    . "no projname found in url\n";
