@@ -102,7 +102,9 @@ $$sql{portdata_gencategories} =
 $$sql{portdata_gensites} =
 	q(CREATE TEMP TABLE sites AS
 	  SELECT host,
+	         type,
 	         total,
+	         homepages,
 	         COALESCE(withnewdistfile, 0) AS withnewdistfile,
 	         CAST (100*(COALESCE(withnewdistfile, 0)*1.0/total*1.0)
 	           AS FLOAT) AS percentage,
@@ -110,17 +112,20 @@ $$sql{portdata_gensites} =
 
 	    FROM (
 	  SELECT sitedata.host,
+	         sitedata.type,
 	         COUNT(maintainer) AS total,
+	         COUNT(CASE WHEN (homepage ILIKE '%' || sitedata.host || '%') THEN 1 END) AS homepages,
 	         COUNT(newver != ver) AS withnewdistfile,
 	         COUNT(CASE WHEN (method=0 AND portdata.ignore=False) THEN 1 END) AS unknow,
-	         SUM(sitedata.failures) AS failures,
-	         SUM(sitedata.successes) AS successes,
-	         SUM(sitedata.liecount) AS liecount,
+	         MAX(sitedata.failures) AS failures,
+	         MAX(sitedata.successes) AS successes,
+	         MAX(sitedata.liecount) AS liecount,
 	         MIN(sitedata.robots_nextcheck) AS robots_nextcheck
 	    FROM portdata
       INNER JOIN sitedata
 	      ON lower(mastersites) LIKE '%' || sitedata.host || '%'
-	GROUP BY sitedata.host
+	      OR lower(homepage) LIKE '%' || sitedata.host || '%'
+	GROUP BY sitedata.host, sitedata.type
 	ORDER BY unknow DESC
 	));
 
