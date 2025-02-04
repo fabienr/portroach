@@ -148,7 +148,7 @@ sub main
 		}
 	}
 
-	info(1, APPNAME . ' v'. APPVER . 'by ' . AUTHOR);
+	info(1, APPNAME . ' v'. APPVER . ' by ' . AUTHOR);
 
 	SwitchUser();
 
@@ -645,7 +645,7 @@ sub VersionCheck
 				next;
 			}
 
-			# New we are ready to guess ...
+			# Now we are ready to guess ...
 			$sh = Portroach::SiteHandler::HttpGuess->new;
 			my $ver = $port->{ver}; # XXX search new version again
 			if (!$sh->GetFiles($site,$port,\@files,$path_ver,$ver)) {
@@ -659,12 +659,10 @@ sub VersionCheck
 			}
 		}
 
-		debug(__PACKAGE__, $port, "Files from $site:");
+		info(1, $k, $host,'Found '.(scalar @files)." files from $site");
 		debug(__PACKAGE__, $port, " -> $_") foreach @files;
 
 		next if (!@files);
-
-		info(1, $k, $host, 'Found ' . scalar @files . ' files');
 
 		debug(__PACKAGE__, $port, "port newver '$port->{newver}'");
 
