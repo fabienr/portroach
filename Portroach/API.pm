@@ -324,7 +324,7 @@ sub AddPort
 
 		if ($var eq 'limitw') {
 			$val = lc $val;
-			if ($val =~ /^(\d{1,2}),(even|odd)$/i) {
+			if ($val =~ /^(\d{1,2}),(even|odd)$/) {
 				$pcfg{limitwhich} = $1;
 				$pcfg{limiteven}  = $2 eq 'even' ? 1 : 0;
 			} else {
@@ -339,6 +339,24 @@ sub AddPort
 		    . "unknown portconfig key ($var)\n";
 	}
 
+	# generate limitver from pkgpath, use pcfg_static to flag those
+	if (!$pcfg{limitver} && (
+	    (fullpkgpathtoport($port->{basepkgpath}) =~
+	    /^(.*\D)([\d\.]{1,5})(?:[\-\_]\D+)?$/) ||
+	    (fullpkgpathtosubcat($port->{basepkgpath}) =~
+	    /^(.*\D)([\d\.]{1,5})(?:[\-\_]\D+)?$/))) {
+		my $limit = $2;
+		debug(__PACKAGE__, $port, "prefix $1 limit $limit");
+		unless (($1.$2) =~ /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/ ||
+		    $port->{ver} !~ "^$limit") {
+			$pcfg{limitver} = "^$limit";
+			$pcfg{pcfg_static} = 1;
+		} else {
+			info(0, $port->{fullpkgpath},
+			    "path ver $limit !~ port ver $port->{ver}");
+		}
+	}
+
 	# Nullify any variables we haven't accumulated
 	foreach (qw(indexsite limitver skipversions limiteven limitwhich)) {
 		$pcfg{$_} = undef if (!exists $pcfg{$_});
@@ -347,11 +365,12 @@ sub AddPort
 	# ...except these, which shouldn't be NULL
 	$pcfg{skipbeta} = 1 if !exists($pcfg{skipbeta});
 	$pcfg{ignore} = 0 if !exists($pcfg{ignore});
+	$pcfg{pcfg_static} = 0 if !exists($pcfg{pcfg_static});
 
 	$sths->{portconfig_update}->execute(
 		$pcfg{indexsite}, $pcfg{limitver}, $pcfg{limiteven},
 		$pcfg{skipbeta}, $pcfg{skipversions}, $pcfg{limitwhich},
-		$pcfg{ignore}, $port->{fullpkgpath}
+		$pcfg{ignore}, $pcfg{pcfg_static}, $port->{fullpkgpath}
 	) if (!$settings{precious_data});
 
 	$sths->{portdata_getnewver}->execute($port->{fullpkgpath});

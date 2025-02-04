@@ -157,7 +157,7 @@ $sql{portconfig_update} =
 	q(UPDATE portdata
 	     SET indexsite = ?, limitver = ?,     limiteven = ?,
 	         skipbeta = ?,  skipversions = ?, limitwhich = ?,
-	         ignore = ?
+	         ignore = ?, pcfg_static = ?
 	   WHERE fullpkgpath = ?);
 
 # XXX howto set pcfg_static ?

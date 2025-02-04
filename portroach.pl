@@ -948,43 +948,10 @@ sub FindNewestFile
 
 		# Only allow new major version if port isn't version-specific
 
-		if ($port->{limitver}) {
-			unless ($new_v =~ /$port->{limitver}/) {
-				debug(__PACKAGE__, $port,
-				   "skip $new_v =~ /$port->{limitver}/");
-				next;
-			}
-
-		} elsif (
-		    (fullpkgpathtoport($port->{basepkgpath}) =~
-		    /^(.*\D)(\d{1,3})(?:[\-\_]\D+)?$/) ||
-		    (fullpkgpathtosubcat($port->{basepkgpath}) =~
-		    /^(.*\D)(\d{1,3})(?:[\-\_]\D+)?$/)) {
-			my $nm_nums = $2;
-			my $vr_nums = $new_v;
-			my $vo_nums = $old_v;
-
-			debug(__PACKAGE__, $port, "prefix $1 nm_nums $nm_nums");
-
-			unless (($1.$2) =~
-			    /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/) {
-				my $fullver = '';
-				while ($vo_nums =~ s/^(\d+?)[\.\-\_]?//) {
-					$fullver .= $1;
-					last if ($fullver eq $nm_nums);
-				}
-
-				if ($fullver eq $nm_nums) {
-					debug(__PACKAGE__, $port,
-					   "fullver $fullver nm_nums $nm_nums");
-					$vr_nums =~ s/[\.\-\_]//g;
-					unless ($vr_nums =~ /^$nm_nums/) {
-						debug(__PACKAGE__, $port,
-						    "skip $vr_nums ~ $nm_nums");
-						next;
-					}
-				}
-			}
+		if ($port->{limitver} && $new_v !~ /$port->{limitver}/) {
+			debug(__PACKAGE__, $port,
+			    "skip $new_v !~ /$port->{limitver}/");
+			next;
 		}
 
 		if (defined $port->{limiteven} and $port->{limitwhich} >= 0) {
@@ -1522,6 +1489,8 @@ sub GenerateHTML
 		$row->{limiteven}      = $row->{limiteven}  ? 'EVEN' : 'ODD';
 		$row->{limitevenwhich} = $row->{limitwhich} ? (
 		    $row->{limitwhich}.':'.$row->{limiteven}) : '';
+		$row->{staticver} = $row->{pcfg_static} ? $row->{limitver} : '';
+		$row->{limitver} = $row->{pcfg_static} ? '' : $row->{limitver};
 
 		$template->pushrow($row);
 		push(@results, $row);

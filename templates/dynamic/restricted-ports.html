@@ -33,11 +33,10 @@
             <ul>
                 <li><b>Limit Regex</b> is a Perl regular expression used to
                     limit the port's version.</li>
+                <li><b>Static Regex</b> are automatically built for ports with
+                    a version number in their name.</li>
                 <li><b>Limit Even/Odd</b> tells portroach to limit the
                     (<i>n</i>+1)th number to even or odd numbers only.
-                </li>
-                <li>Ports with a version number in their name are automatically
-                    dealt with.
                 </li>
             </ul>
         </p>
@@ -55,6 +54,7 @@
             <tr>
                 <th data-sortable="str" class="asc">Pkgpath</th>
                 <th data-sortable="str">Limit Regex</th>
+                <th data-sortable="str">Static Regex</th>
                 <th data-sortable="str">Limit Even/Odd</th>
                 <th data-sortable="str">Skip Versions</th>
                 <th data-sortable="str">Comment</th>
@@ -64,6 +64,7 @@
 %%:         <tr>
 %%:             <td><a href="http://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/%%(basepkgpath)">%%(basepkgpath)</a></td>
 %%:             <td>%%(limitver)</td>
+%%:             <td>%%(staticver)</td>
 %%:             <td>%%(limitevenwhich)</td>
 %%:             <td>%%(skipversions)</td>
 %%:             <td>%%(pcfg_comment)</td>
