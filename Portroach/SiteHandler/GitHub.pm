@@ -94,10 +94,10 @@ sub GetName
 
 	my ($url) = @_;
 
-	if ($url =~ /^$github_re\/([^\/]+)\/([^\/]+)\//) {
-		return "$1/$2";
-	} elsif ($url =~ /^$github_re\/downloads\/(.*)\//) {
+	if ($url =~ /^$github_re\/downloads\/(.*)\//) {
 		return $1;
+	} elsif ($url =~ /^$github_re\/([^\/]+)\/([^\/]+)\//) {
+		return "$1/$2";
 	} else {
 		return undef;
 	}
