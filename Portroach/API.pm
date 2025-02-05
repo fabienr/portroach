@@ -235,7 +235,7 @@ sub AddPort
 		if ($oldport = $sths->{portdata_dedup}->fetchrow_hashref) {
 			debug(__PACKAGE__, $port,
 			    "duplicate with $oldport->{fullpkgpath}");
-			$rc = 4; # return code 4 means duplicate
+			return 4; # return code 4 means duplicate
 		} else {
 			$rc = 1; # return code 1 means added
 		}
