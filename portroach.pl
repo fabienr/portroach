@@ -822,7 +822,7 @@ sub FindNewestFile
 		my $skip = 0;
 		foreach (@bad_versions) {
 			last if (!$settings{freebsdhacks_enable});
-			next unless ($file =~ /$_/ && $distfile !~ /$_/);
+			next unless ($file =~ /$_/i && $distfile !~ /$_/i);
 			debug(__PACKAGE__, $port, "skip $file, bad $_");
 			$skip = 1;
 			last;
