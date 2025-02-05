@@ -66,6 +66,7 @@ our @EXPORT = qw(
 	&extractsuffix
 	&tobasepkgpath
 	&fullpkgpathtoport
+	&fullpkgpathtoleaf
 	&fullpkgpathtosubcat
 	&path_absolute
 	&regress
@@ -1135,6 +1136,28 @@ sub fullpkgpathtoport
 	# ex: devel/libsigc++-2 -> libsigc++
 	# but: x11/kde-plasma/polkit-kde-agent-1 -> polkit-kde-agent-1
 	$port =~ s/^([^\-]+)\-\d+$/$1/;
+
+	return $port;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: fullpkgpathtoleaf()
+# Desc: Extract the last folder name from path.
+#
+# Args: $fullpkgpath - Package path for a specific port variation.
+#
+# Retn: $port        - Plausible name of the port based on its path.
+#------------------------------------------------------------------------------
+
+sub fullpkgpathtoleaf
+{
+	my $fullpkgpath = shift;
+	my $port = $fullpkgpath;
+
+	# Remove any categories, flavors and subpackages.
+	$port =~ s/,.*//g;
+	$port =~ s/.*\///g;
 
 	return $port;
 }

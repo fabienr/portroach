@@ -111,6 +111,9 @@ build chop+= |languages				# www/phpmyadmin
 build chop+= |e16				# x11/enlightenment
 build chop+= |qt3d				# x11/qt5/docs
 
+# do not build limit from pkgpath for those pattern
+build nolimit = bz2|bzip2|ipv6|md5|mp3|p5|pdf2|rc4|rc5|utf8|xfce4
+
 #verbose =		true	# Enable verbose mode (--verbose)
 #debug =		true	# Enable debug mode (--debug)
 

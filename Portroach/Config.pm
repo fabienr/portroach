@@ -65,6 +65,7 @@ my (@paths, %settings_types, $bool_opts);
 	datasrc_opts		=> '',
 
 	build_chop		=> '',
+	build_nolimit		=> '',
 
 	regress			=> 0,	# Don't override database on regression
 	precious_data		=> 0,	# Don't write anything to database

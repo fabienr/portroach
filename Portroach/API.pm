@@ -260,6 +260,29 @@ sub AddPort
 
 	# Portconfig stuff
 
+	# Generate limitver from pkgpath, use pcfg_static to flag those
+	foreach my $path (fullpkgpathtoport($port->{basepkgpath}), 
+	    fullpkgpathtoleaf($port->{basepkgpath}),
+	    fullpkgpathtosubcat($port->{basepkgpath})) {
+		next unless($path=~/^(.*[^\d\.])?([\d\.]{1,5})(?:[\-\_]\D+)?$/);
+		my $prefix = $1;
+		my $limit = quotemeta $2;
+		if (($1.$2) =~ /(?:$settings{build_nolimit})$/i) {
+			debug(__PACKAGE__, $port, "$prefix.$limit: no limit");
+			undef $limit;
+		} elsif ($port->{ver} !~ "^$limit") {
+			debug(__PACKAGE__, $port,
+			    "$prefix.$limit: ver $limit !~ port $port->{ver}");
+			undef $limit;
+		}
+		if ($limit) {
+			debug(__PACKAGE__, $port, "static limitver: ^$limit");
+			$pcfg{limitver} = "^$limit\\.";
+			$pcfg{pcfg_static} = 1;
+			last;
+		}
+	}
+
 	foreach my $var (keys %{$port->{options}}) {
 		my $val = $port->{options}->{$var};
 
@@ -287,13 +310,24 @@ sub AddPort
 				$re =~ /$val/;
 				1;
 			};
-
 			if ($@) {
 				print STDERR "$port->{fullpkgpath}: "
 				    . "bad portconfig regex ($val)\n";
 				next;
 			};
-
+			# Clean and compare generate limitver with port config
+			my $port_limit = $pcfg{limitver};
+			my $conf_limit = $val;
+			$port_limit =~ s/[\\\.]//g;
+			$conf_limit =~ s/[\\\.]//g;
+			if ($port_limit eq $conf_limit) {
+				info(0, $port->{fullpkgpath},
+				    "unneeded limitver $val ~ $pcfg{limitver}");
+			} elsif ($pcfg{limitver}) {
+				info(0, $port->{fullpkgpath},
+				    "use limitver $val != $pcfg{limitver}");
+				$pcfg{pcfg_static} = 0;
+			}
 			$pcfg{limitver} = $val;
 			next;
 		}
@@ -337,24 +371,6 @@ sub AddPort
 		# We've checked for all the variables we support
 		print STDERR "$port->{fullpkgpath}: "
 		    . "unknown portconfig key ($var)\n";
-	}
-
-	# generate limitver from pkgpath, use pcfg_static to flag those
-	if (!$pcfg{limitver} && (
-	    (fullpkgpathtoport($port->{basepkgpath}) =~
-	    /^(.*\D)([\d\.]{1,5})(?:[\-\_]\D+)?$/) ||
-	    (fullpkgpathtosubcat($port->{basepkgpath}) =~
-	    /^(.*\D)([\d\.]{1,5})(?:[\-\_]\D+)?$/))) {
-		my $limit = $2;
-		debug(__PACKAGE__, $port, "prefix $1 limit $limit");
-		unless (($1.$2) =~ /(?:md5|bz2|bzip2|rc4|rc5|ipv6|mp3|utf8)$/ ||
-		    $port->{ver} !~ "^$limit") {
-			$pcfg{limitver} = "^$limit";
-			$pcfg{pcfg_static} = 1;
-		} else {
-			info(0, $port->{fullpkgpath},
-			    "path ver $limit !~ port ver $port->{ver}");
-		}
 	}
 
 	# Nullify any variables we haven't accumulated
