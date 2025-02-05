@@ -341,7 +341,7 @@ sub Check
 
 		$i++;
 
-		$want = wantport($port->{name}, $port->{cat},
+		$want = wantport($port->{fullpkgpath}, $port->{cat},
 		    $port->{maintainer});
 
 		if ($nofork) {

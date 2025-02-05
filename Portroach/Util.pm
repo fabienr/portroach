@@ -1042,7 +1042,7 @@ sub arrexists
 # Desc: Check the restriction lists are either empty or contain the specified
 #       values.
 #
-# Args: $port       - Port name  (undef to skip)
+# Args: $path       - Port path  (undef to skip)
 #       $category   - Category   (undef to skip)
 #       $maintainer - Maintainer (undef to skip)
 #
@@ -1051,7 +1051,7 @@ sub arrexists
 
 sub wantport
 {
-	my ($port, $category, $maintainer) = @_;
+	my ($path, $category, $maintainer) = @_;
 
 	my ($needed, $matched);
 
@@ -1076,15 +1076,11 @@ sub wantport
 		return 0 if ($matched != $needed);
 	}
 
-	if ($want_regex{port} && defined $port) {
+	if ($want_regex{port} && defined $path) {
 		$needed++;
 
-		if ($port =~ $want_regex{port}) {
-			$matched++;
-		} elsif (defined $category and
-		    "$category/$port" =~ $want_regex{port}) {
-			$matched++;
-		}
+		$path =~ $want_regex{port}
+			and $matched++;
 
 		return 0 if ($matched != $needed);
 	}
