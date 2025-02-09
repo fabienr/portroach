@@ -18,6 +18,8 @@
 package Portroach::SiteHandler::GitHub;
 use base Portroach::SiteHandler;
 
+use Capture::Tiny 'capture';
+
 use JSON qw(decode_json);
 use URI;
 
@@ -207,50 +209,41 @@ sub GetFiles
 	}
 
 	# Project may not do releases (any more), so let's load tags anyway.
-	# XXX tags are sorted based on git output (alphabetical)
-	# XXX API /tags returns only top X tags, use '?page=Y' ?
-	# XXX GraphQL can be used for more complex querries
-	$query = 'https://api.github.com/repos/' . $projname . '/tags';
-	debug(__PACKAGE__, $port, "GET $query");
-
-	if ($settings{github_token}) {
-		my $auth_header = HTTP::Headers->new (
-		    'Authorization' => "Token $settings{github_token}");
-		$req = HTTP::Request->new(GET => $query, $auth_header);
-	} else {
-		$req = HTTP::Request->new(GET => $query);
-	}
-
-	$resp = $ua->request($req);
-
-	if (!$resp->is_success || $resp->status_line !~ /^2/) {
-		if ($resp->header('x-ratelimit-remaining') == 0) {
-			print STDERR "$port->{fullpkgpath}: "
-			    . "API rate limit exceeded, "
-			    . "please set 'github token' in portroach.conf\n";
-			return 0;
-		}
-		info(1, $port->{fullpkgpath}, strchop($query, 60)
-		    . ': ' . $resp->status_line);
+	# API /tags are sorted based on git output (alphabetical) and returns
+	# only top X tags. GraphQL looks harder to use. Then, use git directly.
+	my $gitcmd = "GIT_TERMINAL_PROMPT=0 /usr/local/bin/git".
+	    " -c 'versionsort.suffix=-' ls-remote".
+	    " --tags --sort='v:refname'";
+	my $giturl = "https://github.com/$projname.git";
+	debug(__PACKAGE__, $port, "$gitcmd $giturl");
+	my ($out, $err, $rc) = capture {
+		system("$gitcmd $giturl");
+	};
+	if ($rc != 0 or $err) {
+		$err .= '\n' if ($err !~ /\n$/g);
+		info(1, $port->{fullpkgpath}, strchop($giturl, 60)
+		    . ': ' . "$rc, $err");
 		return 0;
 	}
-
-	$json = decode_json($resp->decoded_content);
-	foreach my $tag (@$json) {
-		push(@tags, $tag->{name});
+	foreach my $output (reverse(split /^/m, $out)) {
+		my ($commit, $tag) = split(/\s+/, $output);
+		next if ($tag =~ /\^\{\}$/);
+		$tag =~ s/refs\/tags\///;
+		debug(__PACKAGE__, $port, "$tag");
+		push(@tags, $tag);
 	}
 
 	# In some cases the project name (read: repo) is part of the tagname.
 	# For example: 'heimdal-7.3.0' is the full tagname. Therefore remove the
 	# repository name from the filename just in case.
-	my ($account, $repo) = split('/', $projname);
+	my ($account, $repo) = split('/', lc $projname);
 	$url = "https://github.com/$projname/archive/refs/tags/";
 
 	foreach my $tag (@tags) {
 		my $ver = lc $tag;
 
 		debug(__PACKAGE__, $port, "trim projname -> $ver")
-		    if ($ver =~ s/^($account|$repo)[\-\_]?//);
+		    if ($ver =~ s/($account|$repo)[\-\_]?//);
 		debug(__PACKAGE__, $port, "trim (v|r) marker -> $ver")
 		    if ($ver =~ s/^$verprfx_regex//);
 		debug(__PACKAGE__, $port, "trim \\D SEP -> $ver")
