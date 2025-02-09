@@ -84,7 +84,7 @@ sub GetFiles
 	my ($url, $port, $files, $path_ver) = @_;
 
 	my ($ua, $resp, $host, $link, @dirs, $dir, @tmp, $site, $path,
-	    $path_ver_q, $root_content);
+	    $path_ver_q, $root_content, $depth_limit);
 
 	# A 404 here ought to imply that the distfile
 	# is unavailable, since we expect it to be
@@ -148,8 +148,10 @@ sub GetFiles
 	# Investigate sibling version matches
 	my $found = 0;
 	foreach $dir (@dirs) {
+		my (@tmp, $dir_v, $dir_maj, $new_path);
+
 		last unless $path_ver_q; # skip without version
-		my (@tmp, $dir_v, $new_path);
+		debug(__PACKAGE__, $port, "sibling, $dir");
 
 		# Check version, filter bad matches early
 		$dir_v = $dir;
@@ -158,9 +160,15 @@ sub GetFiles
 			debug(__PACKAGE__, $port, "$dir_v !~ $port->{ver}, "
 			    . "skip dir $dir");
 			next;
-		} elsif (!vercompare($dir_v, $port->{ver})) {
+		}
+		# Check version pattern for major number. If found and the new
+		# version isn't greater, check if major number match.
+		# Otherwise, skip the path.
+		$dir_maj = $1 if ($dir_v =~ /(\d+)\..*/);
+		if ($dir_maj && !vercompare($dir_v, $port->{ver}) &&
+		    $port->{ver} !~ /^$dir_maj/) {
 			debug(__PACKAGE__, $port, "$dir_v < $port->{ver}, "
-			    . "skip dir $dir");
+			    . "skip version $dir");
 			next;
 		}
 
@@ -193,28 +201,24 @@ sub GetFiles
 
 	return 1 if($found);
 
-	# No files found, crawl sibling version dirs, use as last solution
+	# No files found, crawl down the path
 	undef @dirs;
 
 	$site->path($path);
+	$depth_limit = $path =~ tr/\///;
+	$depth_limit += 5; # XXX random guess, five should be enough
 	extractsubdirectories($root_content, \@dirs, $site);
 	debug(__PACKAGE__, $port, "no subdir, $site") if (!@dirs);
 
 	while ($dir = shift(@dirs)) {
-		my (@tmp, $dir_v, $new_path);
+		my @tmp;
 
-		# Check version, filter bad matches early
-		$dir_v = $dir;
-		$dir_v =~ s:.*/($verlike_regex)/.*:$1:i;
-		if (!isversion($dir_v, $port->{ver})) {
-			debug(__PACKAGE__, $port, "$dir_v !~ $port->{ver}, "
-			    . "skip dir $dir");
-			next;
-		} elsif (!vercompare($dir_v, $port->{ver})) {
-			debug(__PACKAGE__, $port, "$dir_v < $port->{ver}, "
-			    . "skip dir $dir");
+		if ($dir =~ tr/\/// > $depth_limit) {
+			debug(__PACKAGE__, $port,
+			    "skip $dir, depth > $depth_limit");
 			next;
 		}
+		debug(__PACKAGE__, $port, "subdir, $dir");
 
 		$site->path($dir);
 		$resp = $ua->get($site);
@@ -233,17 +237,18 @@ sub GetFiles
 				debug(__PACKAGE__,$port,"skip $link !~ $host");
 				next;
 			} elsif ($link !~ /^(https?:\/\/|\/)/) {
-				$link = $site->path . "/$link";
+				$link = $site->path . "$link";
 			}
 			debug(__PACKAGE__, $port, "push $link");
 			push @$files, "$link";
 		}
-		next unless (!@tmp);
 
-		# Still no link found, continue crawling ...
+		# ... continue crawling ...
+		undef @tmp;
 		extractsubdirectories($resp->content, \@tmp, $site);
 		debug(__PACKAGE__, $port, "no subdir, $site") if (!@tmp);
 		foreach my $link (@tmp) {
+			next if (grep { $_ eq $link } @dirs);
 			debug(__PACKAGE__, $port, "DIR $link");
 			push @dirs, "$link";
 		}

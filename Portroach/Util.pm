@@ -800,7 +800,7 @@ sub extractfilenames
 
 #------------------------------------------------------------------------------
 # Func: extractdirectories()
-# Desc: Extract directories matching a version shema
+# Desc: Extract directories matching a version schema
 #
 # Args: $data    - Data from master site request.
 #       \$dirs   - Where to put directories found.
@@ -848,11 +848,28 @@ sub extractsubdirectories
 		# XXX check type also ?
 		if ($link =~ /^.*?:\/\//) {
 			next if ($link !~ /^.*?:\/\/$host_q\//);
+			debug(__PACKAGE__, undef,
+			    "$link =~ s/^.*?:\/\/$host_q\//\//");
 			$link =~ s/^.*?:\/\/$host_q\//\//;
 		}
-		$link = $site->path.$link if ($link !~ /^\//);
+		if ($link !~ /^\//) {
+			debug(__PACKAGE__, undef,
+			    "$link => ".$site->path.".$link");
+			$link = $site->path.$link;
+		}
 		$link = path_absolute($link);
-		next if ($link !~ /^$path_q[^\/]+/);
+		$link =~ s/[^\/]+$//;
+		if ($link eq $site->path) {
+			debug(__PACKAGE__, undef,
+			    "skip, $link eq ".$site->path);
+			next;
+		}
+		if ($link !~ /^$path_q[^\/]+/) {
+			debug(__PACKAGE__, undef,
+			    "skip, $link !~ /^$path_q\[^\/]+/");
+			next;
+		}
+		next if (grep { $_ eq $link } @$dirs);
 		push @$dirs, $link;
 	}
 
