@@ -386,7 +386,7 @@ sub BuildPort
 			$distfile = $2;
 		}
 
-		# ports should not use encoded url
+		# ports may use encoded url
 		if ((my $file = uri_unescape($distfile)) ne $distfile) {
 			print STDERR "$port->{fullpkgpath}: FIX, encoded url "
 			    . "$distfile -> $file\n";
@@ -407,6 +407,13 @@ sub BuildPort
 
 		foreach my $site (split /\s+/, $port->{master_sites}) {
 			my ($canon, $abs_path);
+
+			# ports may use encoded url
+			if ((my $path = uri_unescape($site)) ne $site) {
+				print STDERR "$port->{fullpkgpath}: FIX, ". 
+				    "encoded site $site -> $path\n";
+				$site = $path;
+			}
 
 			# Sanitize site
 			# XXX site group spec. ?
