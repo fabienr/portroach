@@ -84,7 +84,7 @@ sub GetFiles
 	my ($url, $port, $files, $path_ver) = @_;
 
 	my ($ua, $resp, $host, $link, @dirs, $dir, @tmp, $site, $path,
-	    $path_ver_q, $root_content, $depth_limit);
+	    $path_ver_q, $root_resp, $depth_limit);
 
 	# A 404 here ought to imply that the distfile
 	# is unavailable, since we expect it to be
@@ -134,8 +134,8 @@ sub GetFiles
 	$resp = $ua->get($site);
 
 	if ($resp->is_success) {
-		$root_content = $resp->content;
-		extractdirectories($root_content, \@dirs);
+		$root_resp = $resp;
+		extractdirectories($resp->content, \@dirs);
 		debug(__PACKAGE__, $port, "no dirs, $site") if (!@dirs);
 	} else {
 		# As we previously got an answer, this is not a failure
@@ -207,7 +207,7 @@ sub GetFiles
 	$site->path($path);
 	$depth_limit = $path =~ tr/\///;
 	$depth_limit += 5; # XXX random guess, five should be enough
-	extractsubdirectories($root_content, \@dirs, $site);
+	extractsubdirectories($root_resp, \@dirs, $site);
 	debug(__PACKAGE__, $port, "no subdir, $site") if (!@dirs);
 
 	while ($dir = shift(@dirs)) {
@@ -245,7 +245,7 @@ sub GetFiles
 
 		# ... continue crawling ...
 		undef @tmp;
-		extractsubdirectories($resp->content, \@tmp, $site);
+		extractsubdirectories($resp, \@tmp, $site);
 		debug(__PACKAGE__, $port, "no subdir, $site") if (!@tmp);
 		foreach my $link (@tmp) {
 			next if (grep { $_ eq $link } @dirs);

@@ -827,7 +827,7 @@ sub extractdirectories
 # Func: extractsubdirectories()
 # Desc: Extract directories from a mastersite index, going down the path only.
 #
-# Args: $data    - Data from master site request.
+# Args: $resp    - Response from master site request.
 #       \$dirs   - Where to put directories found, only full path, ^/
 #       $site    - Actual, full path on the site to resolve/filter link.
 #
@@ -836,13 +836,14 @@ sub extractdirectories
 
 sub extractsubdirectories
 {
-	my ($data, $dirs, $site) = @_;
+	my ($resp, $dirs, $site) = @_;
 
 	my $host_q = quotemeta $site->host;
 	my $path_q = quotemeta $site->path;
 
-	foreach (split "<", $data) {
+	foreach (split "<", $resp->content) {
 		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/);
+		debug(__PACKAGE__, undef, "$_"); # XXX debug
 		my $link = $2;
 		# check same host, extract actual path
 		# XXX check type also ?
@@ -854,8 +855,8 @@ sub extractsubdirectories
 		}
 		if ($link !~ /^\//) {
 			debug(__PACKAGE__, undef,
-			    "$link => ".$site->path.".$link");
-			$link = $site->path.$link;
+			    "$link => ".$resp->base.".$link");
+			$link = $resp->base.$link;
 		}
 		$link = path_absolute($link);
 		$link =~ s/[^\/]+$//;
