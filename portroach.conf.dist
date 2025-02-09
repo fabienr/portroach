@@ -121,7 +121,19 @@ mastersite limit =	4	# Give up after this many sites
 
 # Master sites to ignore checking (might be fallback mirrors not carrying new
 # versions). Items in the list may contain * and ? wildcard characters.
-mastersite ignore =	*openbsd.org/pub/OpenBSD/distfiles/*
+mastersite ignore = *openbsd.org/pub/OpenBSD/distfiles/*
+mastersite ignore+= ,*firmware.openbsd.org*
+mastersite ignore+= ,*ftp.omarpolo.com*
+mastersite ignore+= ,*spacehopper.org*
+mastersite ignore+= ,*comstyle.com*
+mastersite ignore+= ,*distfiles.bsdfrog.org*
+mastersite ignore+= ,*distfiles.sigtrap.nl*
+mastersite ignore+= ,*dead-parrot.de*
+mastersite ignore+= ,*github.com/gonzalo-/openbsd-distfiles*
+mastersite ignore+= ,*sizeofvoid.org/pub/OpenBSD/distfiles*
+mastersite ignore+= ,*distfiles.roadrunner.page*
+mastersite ignore+= ,*dickman.org/openbsd/distfiles*
+mastersite ignore+= ,*distfiles.gentoo.org/distfiles*
 
 # Stop checking other site if old/new version are found, default to true
 #oldfound enable =	false
