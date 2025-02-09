@@ -125,7 +125,7 @@ $date_regex  = qr/(?<!\d)\d{2,4}([\.\-\_]?)
 
 %beta_types = (
 	snapshot   => { re => 'svn|cvs|snap(?:shot)?|nightly',	rank => 1 },
-	unstable   => { re => 'unstable|dev|test',		rank => 2 },
+	unstable   => { re => 'unstable|dev|test|adhoc',	rank => 2 },
 	alpha      => { re => 'alpha|a(?=\d+|$)',		rank => 3 },
 	beta       => { re => 'beta|b(?=\d+|$)',		rank => 4 },
 	prerelease => { re => 'pr.*?|p(?=\d+|$)',		rank => 5 },
