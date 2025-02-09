@@ -277,7 +277,7 @@ sub AddPort
 		}
 		if ($limit) {
 			debug(__PACKAGE__, $port, "static limitver: ^$limit");
-			$pcfg{limitver} = "^$limit\\.";
+			$pcfg{limitver} = "^$limit(\\.|\$)";
 			$pcfg{pcfg_static} = 1;
 			last;
 		}
@@ -318,7 +318,7 @@ sub AddPort
 			# Clean and compare generate limitver with port config
 			my $port_limit = $pcfg{limitver};
 			my $conf_limit = $val;
-			$port_limit =~ s/[\\\.]//g;
+			$port_limit =~ s/[\\\.\|\(\)\$]//g;
 			$conf_limit =~ s/[\\\.]//g;
 			if ($port_limit eq $conf_limit) {
 				info(0, $port->{fullpkgpath},
