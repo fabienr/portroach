@@ -139,7 +139,7 @@ $ext_regex = qr/(?:l|t?b|t?g|t?x)?z(?:2|st)?|
     mmdb|otf|pdf|phar|rar|rpm|run|sfc|shar|spl|tar|tgz|ttf|txi|txt|uqm|war|
     zip/xi;
 
-$verprfx_regex = qr/(?:v|ver|r|rel|release)[\.\-\_]?(?=\d)/;
+$verprfx_regex = qr/(?:v|ver|version|r|rel|release)[\.\-\_]?(?=\d)/;
 
 $verlike_regex = qr/
     \d+[\.\-\_]\d+[^\/]*?
