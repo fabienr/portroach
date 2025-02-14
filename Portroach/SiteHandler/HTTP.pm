@@ -83,19 +83,14 @@ sub GetFiles
 
 	my ($url, $port, $files, $path_ver) = @_;
 
-	my ($ua, $resp, $host, $link, @dirs, $dir, @tmp, $site, $path,
+	my ($ua, $resp, $host, $rc, $link, @dirs, $dir, @tmp, $site, $path,
 	    $path_ver_q, $root_resp, $depth_limit);
-
-	# A 404 here ought to imply that the distfile
-	# is unavailable, since we expect it to be
-	# inside this directory. However, some sites
-	# use scripts or rewrite rules disguised as
-	# directories.
 
 	$ua = lwp_useragent();
 	$resp = $ua->get($url);
 	$host = $url->host;
 	$host = s/.*\.([^\.]*?\.[^\.])$/$1/; # check only for top domain
+	$rc = 1; # return success by default
 
 	if ($resp->is_success) {
 		my @tmp;
@@ -112,9 +107,14 @@ sub GetFiles
 		    "no link mathing $port->{sufx}")
 		    if (!@$files);
 	} else {
+		# A 404 here ought to imply that the distfile
+		# is unavailable, since we expect it to be
+		# inside this directory. However, some sites
+		# use scripts or rewrite rules disguised as
+		# directories.
 		info(1, $port->{fullpkgpath}, strchop($url, 60)
 		    . ': ' . $resp->status_line);
-		return 0;
+		$rc = 0;
 	}
 
 	# XXX indexsite from Makefile may prevent path_ver detection
@@ -138,11 +138,9 @@ sub GetFiles
 		extractdirectories($resp->content, \@dirs);
 		debug(__PACKAGE__, $port, "no dirs, $site") if (!@dirs);
 	} else {
-		# As we previously got an answer, this is not a failure
 		info(1, $port->{fullpkgpath}, strchop($site, 60)
 		    . ': ' . $resp->status_line);
-		# XXX maybe return code depends on !@$files ?
-		return 1; # success
+		return $rc;
 	}
 
 	# Investigate sibling version matches
@@ -255,7 +253,7 @@ sub GetFiles
 		}
 	}
 
-	return 1;
+	return $rc;
 }
 
 1;
