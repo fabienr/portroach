@@ -241,15 +241,16 @@ sub GetFiles
 
 	foreach my $tag (@tags) {
 		my $ver = lc $tag;
+		$tag =~ s/\//%2F/;
 
+		debug(__PACKAGE__, $port, "replace / by _ -> $ver")
+		    if ($ver =~ s/\//\_/g);
 		debug(__PACKAGE__, $port, "trim projname -> $ver")
 		    if ($ver =~ s/($account|$repo)[\-\_]?//);
 		debug(__PACKAGE__, $port, "trim (v|r) marker -> $ver")
 		    if ($ver =~ s/^$verprfx_regex//);
 		debug(__PACKAGE__, $port, "trim \\D SEP -> $ver")
 		    if ($ver =~ s/^\D*[\.\-\_]//);
-		debug(__PACKAGE__, $port, "replace / by + -> $ver")
-		    if ($ver =~ s/\//\+/g);
 
 		debug(__PACKAGE__, $port, "tag $tag -> $ver")
 		    if ($tag ne $ver);
