@@ -785,9 +785,9 @@ sub extractfilenames
 	$sufx = quotemeta $sufx;
 
 	foreach (split "<", $data) {
-		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/);
+		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/i);
 		my $link = $2;
-		next unless $link =~ /$sufx$/;
+		next unless $link =~ /$sufx$/i;
 		my $file = uri_unescape($link);
 		debug(__PACKAGE__, undef, "unescape $link -> $file")
 		    if ($file ne $link);
@@ -813,9 +813,9 @@ sub extractdirectories
 	my ($data, $dirs) = @_;
 
 	foreach (split "<", $data) {
-		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/);
+		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/i);
 		my $link = $2;
-		next unless $link =~ /$verlike_regex/;
+		next unless $link =~ /$verlike_regex/i;
 		push @$dirs, $link;
 	}
 
@@ -842,21 +842,17 @@ sub extractsubdirectories
 	my $path_q = quotemeta $site->path;
 
 	foreach (split "<", $resp->content) {
-		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/);
-		debug(__PACKAGE__, undef, "$_"); # XXX debug
+		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/i);
 		my $link = $2;
 		# check same host, extract actual path
-		# XXX check type also ?
-		if ($link =~ /^.*?:\/\//) {
-			next if ($link !~ /^.*?:\/\/$host_q\//);
-			debug(__PACKAGE__, undef,
-			    "$link =~ s/^.*?:\/\/$host_q\//\//");
-			$link =~ s/^.*?:\/\/$host_q\//\//;
-		}
-		if ($link !~ /^\//) {
+		if ($link !~ /^(.*?:\/\/|\/)/) {
 			debug(__PACKAGE__, undef,
 			    "$link => ".$resp->base.".$link");
 			$link = $resp->base.$link;
+		}
+		if ($link =~ /^.*?:\/\//) {
+			next if ($link !~ /^.*?:\/\/$host_q\//i);
+			$link =~ s/^.*?:\/\/$host_q\//\//i;
 		}
 		$link = path_absolute($link);
 		$link =~ s/[^\/]+$//;
@@ -865,9 +861,9 @@ sub extractsubdirectories
 			    "skip, $link eq ".$site->path);
 			next;
 		}
-		if ($link !~ /^$path_q[^\/]+/) {
+		if ($link !~ /^$path_q[^\/]+/i) {
 			debug(__PACKAGE__, undef,
-			    "skip, $link !~ /^$path_q\[^\/]+/");
+			    "skip, $link !~ /^$path_q\[^\/]+/i");
 			next;
 		}
 		next if (grep { $_ eq $link } @$dirs);
