@@ -165,9 +165,10 @@ sub GetFiles
 		# version isn't greater, check if major number match.
 		# Otherwise, skip the path.
 		$dir_maj = $1 if ($dir_v =~ /(\d+)\..*/);
-		if ($dir_maj && !vercompare($dir_v, $port->{ver}) &&
+		if ( length $dir_maj && !vercompare($dir_v, $port->{ver}) &&
 		    $port->{ver} !~ /^$dir_maj/) {
-			debug(__PACKAGE__, $port, "$dir_v < $port->{ver}, "
+			debug(__PACKAGE__, $port,
+			    "$dir_v < $port->{ver} !~ /^$dir_maj/, "
 			    . "skip version $dir");
 			next;
 		}
