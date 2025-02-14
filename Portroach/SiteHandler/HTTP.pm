@@ -126,7 +126,7 @@ sub GetFiles
 	$path = $site->path;
 	if ($path_ver) {
 		$path_ver_q = quotemeta $path_ver;
-		$path =~ s/$path_ver_q\/.*//;
+		$path =~ s/($verprfx_regex)?$path_ver_q\/.*//;
 		$site->path($path);
 		debug(__PACKAGE__, $port, "switch to $path");
 	}
@@ -155,7 +155,7 @@ sub GetFiles
 
 		# Check version, filter bad matches early
 		$dir_v = $dir;
-		$dir_v =~ s:(.*/)?($verlike_regex)/.*:$2:i;
+		$dir_v =~ s:^(.*/)?($verprfx_regex)?($verlike_regex)/.*$:$3:i;
 		if (!isversion($dir_v, $port->{ver})) {
 			debug(__PACKAGE__, $port, "$dir_v !~ $port->{ver}, "
 			    . "skip dir $dir");

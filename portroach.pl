@@ -531,8 +531,8 @@ sub VersionCheck
 
 		# Look to see if the URL contains the distfile version.
 		# This will affect our checks and guesses later on.
-		if ($site =~ m:^.*/($verlike_regex)/.*$:) {
-			my $dir_ver = $1;
+		if ($site =~ m:^.*/($verprfx_regex)?($verlike_regex)/.*$:) {
+			my $dir_ver = $2;
 			my $dir_ver_q = vertoregex($dir_ver);
 			debug(__PACKAGE__, $port, "port_ver $port->{ver}, "
 			    . "dir_ver $dir_ver, regex $dir_ver_q");
