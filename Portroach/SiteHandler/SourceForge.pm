@@ -106,6 +106,7 @@ sub GetName
 	}
 }
 
+
 #------------------------------------------------------------------------------
 # Func: GetFiles()
 # Desc: Extract a list of files from the given URL. In the case of SourceForge,
@@ -139,8 +140,7 @@ sub GetFiles
 	}
 
 	# Find the RSS feed for this project.
-	$query = 'http://sourceforge.net/projects/'
-		. $projname . '/rss?limit=1000';
+	$query = "http://sourceforge.net/projects/$projname/rss?limit=1000";
 
 	debug(__PACKAGE__, $port, "GET $query");
 	$ua = lwp_useragent();
@@ -148,19 +148,19 @@ sub GetFiles
 
 	if (!$resp->is_success || $resp->status_line !~ /^2/) {
 		info(1, $port->{fullpkgpath}, strchop($query, 60)
-			. ': ' . $resp->status_line);
+		    . ': ' . $resp->status_line);
 		return 0;
 	}
 
 	my $feed = XML::Feed->parse(\$resp->content);
 	unless ($feed) {
-		print STDERR "$port->{fullpkgpath}: $query, "
-			. "invalid feed, " . XML::Feed->errstr . "\n";
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+		    . ': invalid feed, ' . XML::Feed->errstr);
 		return 0;
 	}
 	unless ($feed->entries) {
-		print STDERR "$port->{fullpkgpath}: $query, "
-			. "invalid feed, no entries\n";
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+		    . ': invalid feed, no entries');
 		return 0;
 	}
 
