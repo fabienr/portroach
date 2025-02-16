@@ -1197,6 +1197,8 @@ sub GenerateHTMLPorts
 
 	if ($prefix eq "state") {
 		$sth->execute();
+	} elsif ($prefix eq "site") {
+		$sth->execute($page, $page);
 	} else {
 		$sth->execute($page);
 	}

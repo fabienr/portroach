@@ -303,6 +303,7 @@ $sql{portdata_selectall_site} =
 	q(SELECT *
 	    FROM portdata
 	   WHERE lower(mastersites) LIKE '%' || (?) || '%'
+	      OR lower(homepage) LIKE '%' || (?) || '%'
 	ORDER BY cat,name);
 
 $sql{portdata_selectall_unknow} =
