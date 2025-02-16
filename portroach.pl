@@ -991,12 +991,13 @@ sub FindNewestFile
 				}
 
 				# No url if there is no file (%%version)
-				if ($file) {
+				unless ($file) {
+					$poss_url = "";
+				} else {
 					$poss_url->path($poss_url->path . '/')
 					    if ($poss_url !~ /\/$/);
-					uri_filename($poss_url, $file);
-				} else {
-					$poss_url = "";
+					uri_filename($poss_url,
+					    uri_unescape($file));
 				}
 
 				debug(__PACKAGE__, $port, "last found "
