@@ -38,6 +38,7 @@ use LWP::UserAgent;
 use MIME::Lite;
 use Net::FTP;
 use URI;
+use URI::Escape;
 use JSON qw(decode_json);
 use List::Util qw(first);
 
