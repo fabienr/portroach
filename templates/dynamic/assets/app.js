@@ -47,7 +47,8 @@ filters.forEach((f) => {
                     return filterValue && (
                         cellValue == "" || parseFloat(cellValue) === 0);
                 }
-                return !cellValue.includes(filterValue);
+                return !cellValue.toLowerCase().includes(
+                    filterValue.toLowerCase());
             });
             row.style.display = isHidden ? 'none' : '';
         });
