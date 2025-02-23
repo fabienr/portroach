@@ -96,7 +96,7 @@ sub GetFiles
 
 	# Strip all the digits at the end to keep the stem of the module.
 	if ($port->{distname} =~ /(.*?)-(\d+)/) {
-	    $package = $1;
+		$package = $1;
 	}
 
 	$query = $pypi . $package . '/json';
@@ -105,17 +105,23 @@ sub GetFiles
 	$ua = lwp_useragent();
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 	if ($resp->is_success) {
-	    my ($json, $urls);
+		my ($json, $urls);
 
-    	    $json = decode_json($resp->decoded_content);
-	    $urls = $json->{urls};
-	    foreach my $url (@$urls) {
-		push(@$files, $url->{filename});
-	    }
+		$json = decode_json($resp->decoded_content);
+		$urls = $json->{urls};
+		foreach my $url (@$urls) {
+			push(@$files, $url->{filename});
+		}
+		my @releases = ( keys %{$json->{releases}} );
+		foreach my $version (@releases) {
+			foreach my $file (@{$json->{releases}{$version}}) {
+				push(@$files, $file->{url});
+			}
+		}
 	} else {
-	    info(1, $port->{fullpkgpath}, strchop($query, 60)
-	        . ': ' . $resp->status_line);
-	    return 0;
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+		    . ': ' . $resp->status_line);
+		return 0;
 	}
 
 	return 1;
