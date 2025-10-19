@@ -341,7 +341,7 @@ sub chopbeta
 	$version = \$version if (!ref $version);
 
 	return 1 if ($$version =~
-	    s/^(.*)[\.\-\_](?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi);
+	    s/^(.*)[\.\-\_\+](?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi);
 	return 1 if ($$version =~
 	    s/^(.*)(?<=\d)(?:$beta_regex)\d*(?:\.\d+)*(.*)$/$1$2/gi)
 }
