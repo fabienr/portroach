@@ -27,6 +27,33 @@
 
 package Portroach::SiteHandler;
 
+# XXX todo, rework sitehandler api
+# All handlers GetFiles() take those args :
+# Args: $url     - URL we would normally fetch from.
+#       \%port   - Port hash fetched from database.
+#       \@files  - Array to put files into.
+# Then some handlers get specific extra args on top :
+# FTP, HTTP, HttpGuess
+#       $path_ver - Version found in url, upper directory to inspect.
+# HttpHomepage
+#       \@checked - Array of site/handler already processed.
+# CPAN, SourceForge
+#       \@sites    - Array to put new site found into.
+#       \@homepages- Array to put new homepage found into.
+# Ideally, the new api could ease FindNewestFile() checks by providing more
+# informations instead of embeded coding into a single string.
+# Latest version from handler ? (Go, CPAN ...) Allow beta ?
+# Known version from files ? (Github ...)
+# No link, only version 
+# Relative file, absolute url or path ?
+
+# generic handlers for direct call from VersionCheck (not in sitehandlers)
+use Portroach::SiteHandler::FTP;
+use Portroach::SiteHandler::HTTP;
+use Portroach::SiteHandler::HttpGuess;
+use Portroach::SiteHandler::HttpHomepage;
+
+# site specific handlers
 use Portroach::SiteHandler::Bitbucket;
 use Portroach::SiteHandler::Codeberg;
 use Portroach::SiteHandler::CPAN;
