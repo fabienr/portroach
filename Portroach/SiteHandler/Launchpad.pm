@@ -76,7 +76,8 @@ sub CanHandle
 
 #------------------------------------------------------------------------------
 # Func: GetFiles()
-# Desc:
+# Desc: Extract a list of files from the given URL. Query the launchpad API
+#       for latest releases and then fetch the actual file list.
 #
 # Args: $url     - URL we would normally fetch from.
 #       \%port   - Port hash fetched from database.
