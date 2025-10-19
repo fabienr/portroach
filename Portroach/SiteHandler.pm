@@ -28,6 +28,7 @@
 package Portroach::SiteHandler;
 
 use Portroach::SiteHandler::Bitbucket;
+use Portroach::SiteHandler::Codeberg;
 use Portroach::SiteHandler::CPAN;
 use Portroach::SiteHandler::GitHub;
 use Portroach::SiteHandler::Go;
