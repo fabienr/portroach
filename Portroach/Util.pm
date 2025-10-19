@@ -153,10 +153,11 @@ $date_regex  = qr/(?<!\d)(?:\d{2,4})?(?<SEP>[\.\-\_]?)
 %beta_types = (
 	snapshot   => { re => 'svn|cvs|snap(?:shot)?|nightly',	rank => 1 },
 	unstable   => { re => 'unstable|dev|test|adhoc',	rank => 2 },
-	alpha      => { re => 'alpha|a(?=\d+|$)',		rank => 3 },
-	beta       => { re => 'beta|b(?=\d+|$)',		rank => 4 },
-	prerelease => { re => 'pr.*?|p(?=\d+|$)',		rank => 5 },
-	relcand    => { re => 'rc|r(?=\d+|$)',			rank => 6 }
+	milestone  => { re => 'milestone|m(?:\d+|$)',		rank => 3 },
+	alpha      => { re => 'alpha|a(?:\d+|$)',		rank => 4 },
+	beta       => { re => 'beta|b(?:\d+|$)',		rank => 5 },
+	prerelease => { re => 'pre|pr?(?:\d+|$)',		rank => 6 },
+	relcand    => { re => 'rc|\d[\.\-\_]?r(?:\d+|$)',	rank => 7 }
 );
 
 $beta_regex = join '|', map +($beta_types{$_}->{re}), keys %beta_types;
@@ -889,6 +890,8 @@ sub betacompare
 {
 	my ($new, $old) = @_;
 
+	#debug(__PACKAGE__, undef, "betacompare $new vs $old");
+
 	my $newrank = 0;
 	my $oldrank = 0;
 	my $newnums = 0;
@@ -898,18 +901,22 @@ sub betacompare
 		my $re   = $beta_types{$bt}->{re};
 		my $rank = $beta_types{$bt}->{rank};
 
-		if ($new =~ /[\.\-\_](?:$re)(\d*(?:\.\d+)*)/ ||
-		    $new =~ /(?<=\d)(?:$re)(\d*(?:\.\d+)*)/) {
+		if ($new =~ /[\.\-\_](($re)(\d*(?:\.\d+)*))$/ ||
+		    $new =~ /(?<=\d)(($re)(\d*(?:\.\d+)*))/) {
 			$newrank = $rank;
 			$newnums = $1 if $1;
+			$newnums =~ s/^\D+//;
 		}
 
-		if ($old =~ /[\.\-\_](?:$re)(\d*(?:\.\d+)*)/ ||
-		    $old =~ /(?<=\d)(?:$re)(\d*(?:\.\d+)*)/) {
+		if ($old =~ /[\.\-\_](($re)(\d*(?:\.\d+)*))/ ||
+		    $old =~ /(?<=\d)(($re)(\d*(?:\.\d+)*))/) {
 			$oldrank = $rank;
 			$oldnums = $1 if $1;
+			$oldnums =~ s/^\D+//;
 		}
 	}
+	#debug(__PACKAGE__, undef,
+	#    "betacompare ($newrank/$newnums) vs ($oldrank/$oldnums)");
 
 	if ($oldrank == $newrank) {
 		my @nums_new = split /\D+/, $newnums;
