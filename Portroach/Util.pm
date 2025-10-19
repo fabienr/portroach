@@ -167,12 +167,13 @@ $ext_regex = qr/(?:l|t?b|t?g|t?x)?z(?:2|st)?|
     mmdb|otf|pdf|phar|rar|rpm|run|sfc|shar|spl|tar|tgz|ttf|txi|txt|uqm|war|
     zip/xi;
 
-$verprfx_regex = qr/(?:v|ver|version|r|rel|release)[\.\-\_]?(?=\d)/;
+$verprfx_regex = qr/(?:v|ver|version|r|rel|release)(?:[\.\-\_]|(?=\d))/;
 
-$verlike_regex = qr/
+$verlike_regex = qr/(?:$beta_regex)?(?:
     \d+[\.\-\_]\d+[^\/]*?
     |$date_regex
-    |\d{2,}([a-z]{,2}\d{,2})?/x;
+    |\d{2,}([a-z]{,2}\d{,2})?
+    |\d(?:\/|$))/x;
 
 $lang_regex = qr/(?:cpp|hs|lua|mod|node|p5|perl|py\d?|ruby)/;
 
@@ -651,27 +652,41 @@ sub verguess
 # Desc: Compare two version strings and return true if $new is greater than
 #       $old; otherwise return false.
 #
-# Args: $new    - New version string
-#       $old    - Old version string
+# Args: $new       - New version string
+#       $old       - Old version string
+#       $recursive - Call recusrsively ?
 #
 # Retn: $result - Is $new greater than $old? Returns -1 for "Maybe"
 #------------------------------------------------------------------------------
 
 sub vercompare
 {
-	my ($new, $old) = @_;
+	my ($new, $old, $recursive) = @_;
+
+	unless ($recursive) {
+		my $result = vercompare($new, $old, 1);
+		debug(__PACKAGE__, undef, "=> $new > $old") if ($result == 1);
+		debug(__PACKAGE__, undef, "=> $new ~> $old") if ($result == -1);
+		debug(__PACKAGE__, undef, "=> $new <= $old") if ($result == 0);
+		return $result;
+	}
+
+	#debug(__PACKAGE__, undef, "vercompare $new vs $old");
 
 	# 10.2+2.0.1 Vs 10+2.0
-	if ($new =~ /\+/ && $old =~ /\+/) {
+	if ($new =~ /\+$verlike_regex/ || $old =~ /\+$verlike_regex/) {
 		my @news = split('\+', $new);
 		my @olds = split('\+', $old);
 		if (scalar @news == scalar @olds) {
+			#debug(__PACKAGE__, undef, "SPLIT $new vs $old");
 			for my $i (0 .. $#news) {
 				my $new  = $news[$i];
 				my $old = $olds[$i];
 				next if ($new eq $old);
-				return vercompare($new, $old);
+				return vercompare($new, $old, 1);
 			}
+			#debug(__PACKAGE__, undef, "SPLIT => $new equal $old");
+			return 0;
 		}
 	}
 
@@ -686,6 +701,9 @@ sub vercompare
 		# Now save the last chars and versions.
 		($new_v, $new_c) = $new =~ m/(.*?)([a-zA-Z]{1})$/;
 		($old_v, $old_c) = $old =~ m/(.*?)([a-zA-Z]{1})$/;
+
+		#debug(__PACKAGE__, undef,
+		#    "CHAR $new_v($new_c) vs $old_v($old_c)");
 
 		if ($new_v eq $old_v) {
 			return (($new_c cmp $old_c) == 1) ? 1 : 0;
@@ -702,6 +720,7 @@ sub vercompare
 		my ($newbeta, $oldbeta, $newdots, $olddots);
 
 		if (chopbeta(\$_new)) {
+			#debug(__PACKAGE__, undef, "BETA new v $new -> $_new");
 			# $new and $old equal except for beta bit
 			# Therefore, $old (a final release) is newer
 			return 0 if ($_new eq $old);
@@ -710,6 +729,7 @@ sub vercompare
 		}
 
 		if (chopbeta(\$_old)) {
+			#debug(__PACKAGE__, undef, "BETA old v $old -> $_old");
 			# $new and $old equal except for beta bit
 			# Therefore, $new (a final release) is newer
 			return 1 if ($_old eq $new);
@@ -734,9 +754,12 @@ sub vercompare
 			# differ, compare them.
 			return (betacompare($new, $old))
 				if ($_new eq $_old);
+			#debug(__PACKAGE__, undef, "no need to trim beta");
 		} else {
 			# Remove beta bits, as non-beta bits
 			# differ and can be compared.
+			#debug(__PACKAGE__, undef, "trim beta -> $new vs $old")
+			#    unless ($new eq $_new && $old eq $_old);
 			$new = $_new;
 			$old = $_old;
 		}
@@ -748,9 +771,6 @@ sub vercompare
 
 	unless ($new =~ /^$date_regex$/ && $old =~ /^$date_regex$/)
 	{
-		my $date_regex = $date_regex;
-		$date_regex =~ s/\\1/\\3/g; # Bump internal backreference (evil)
-
 		# XXX -> [\.\-\_]
 		if ($new =~ /^(.*?)[\-\.]?($date_regex)[\-\.]?(.*)$/) {
 			my ($new_1, $new_2, $new_3) = ($1, $2, $4);
@@ -758,17 +778,23 @@ sub vercompare
 			# XXX -> [\.\-\_]
 			if ($old =~ /^(.*?)[\-\.]?($date_regex)[\-\.]?(.*)$/) {
 				my ($old_1, $old_2, $old_3) = ($1, $2, $4);
+				#debug(__PACKAGE__, undef,
+				#    "vercompare old $old_1, $old_2, $old_3"
+				#    . " new $new_1, $new_2, $new_3");
 
 				if ($new_1 and $old_1) {
-					return vercompare($new_1, $old_1) unless ($new_1 eq $old_1);
+					return vercompare($new_1, $old_1, 1)
+					    unless ($new_1 eq $old_1);
 				}
 
 				if ($new_2 and $old_2) {
-					return vercompare($new_2, $old_2) unless ($new_2 eq $old_2);
+					return vercompare($new_2, $old_2, 1)
+					    unless ($new_2 eq $old_2);
 				}
 
 				if ($new_3 and $old_3) {
-					return vercompare($new_3, $old_3) unless ($new_3 eq $old_3);
+					return vercompare($new_3, $old_3, 1)
+					    unless ($new_3 eq $old_3);
 				} elsif ($new_3) {
 					return 1;
 				} else {
@@ -796,23 +822,37 @@ sub vercompare
 		}
 	}
 
-	my @nums_new = split /\D+/, $new;
-	my @nums_old = split /\D+/, $old;
+	# Check for digit only version
 
-	# Make sure x.y.z is newer then xxxxx
-	# debug(__PACKAGE__, undef, "vercompare "
-	#     . "$new ($#nums_new) vs $old ($#nums_old)");
-	return 0 if ($#nums_new == 0 && $#nums_old > 0);
+	if ($new =~ /^\d+$/ && $old =~ /^\d+$/) {
+		#debug(__PACKAGE__, undef, "vercompare digit $new vs $old");
+		return 1 if (0+$new > 0+$old);
+		return 0 if (0+$new < 0+$old);
+	}
+
+	# Split version shema then compare its components
+	my @nums_new = split /[\.\-\_\+\~]+/, $new;
+	my @nums_old = split /[\.\-\_\+\~]+/, $old;
+
+	# Make sure x.y.z is newer than xxxxx but not x+1
+	#debug(__PACKAGE__, undef, "vercompare "
+	#    . "$new ($#nums_new) vs $old ($#nums_old)");
+	return 0 if ($#nums_new == 0 && $#nums_old > 0 and
+	    length $nums_new[0] != length $nums_old[0] and
+	    int($nums_new[0]) != int($nums_old[0])+1);
 
 	foreach my $n (0 .. $#nums_new) {
-		# debug(__PACKAGE__, undef, "vercompare "
-		#     . $nums_new[$n]." / ".$nums_old[$n]);
+		my ($num_new, $num_old);
+		#debug(__PACKAGE__, undef, "vercompare "
+		#    . $nums_new[$n]." / ".$nums_old[$n]);
 		# All preceding components are equal, so assume newer.
 		return 1 if (!defined($nums_old[$n]));
 
+		# XXX experimental, let's check & see
 		# Attempt to handle cases where version component lengths vary.
-		if ($n == $#nums_new &&
-		    length $nums_new[$n] != length $nums_old[$n])
+		if ($n == $#nums_new && $nums_old[$n] ne '0' &&
+		    length $nums_new[$n] != length $nums_old[$n] &&
+		    $nums_new[$n] =~ /^\d+$/ && $nums_old[$n] =~ /^\d+$/)
 		{
 			my $lendiff_thresh;
 
@@ -835,33 +875,62 @@ sub vercompare
 			$first_old = substr($nums_old[$n], 0, 1);
 
 			if ($lendiff >= $lendiff_thresh) {
+				#debug(__PACKAGE__, undef,
+				#    "diff $lendiff >= tresh $lendiff_thresh");
 				if ($first_new > $first_old) {
+					#debug(__PACKAGE__, undef,
+					#    "$first_new > $first_old : -1");
 					return -1;
 				} elsif ($first_new == $first_old) {
 					$nums_old[$n] .= ('0' x $lendiff);
+					#debug(__PACKAGE__, undef,
+					#    "$nums_new[$n] > $nums_old[$n] ?");
 					return ($nums_new[$n] > $nums_old[$n]
 					    ? -1 : 0);
 				} else {
+					#debug(__PACKAGE__, undef,
+					#    "$first_new < $first_old : 0");
 					return 0;
 				}
 			} elsif ($lendiff <= -$lendiff_thresh) {
+				#debug(__PACKAGE__, undef,
+				#    "diff $lendiff <= tresh $lendiff_thresh");
 				if ($first_new < $first_old) {
+					#debug(__PACKAGE__, undef,
+					#    "$first_new < $first_old : 0");
 					return 0;
 				} elsif ($first_new == $first_old) {
 					$nums_new[$n] .= ('0' x abs $lendiff);
+					#debug(__PACKAGE__, undef,
+					#    "$nums_new[$n] < $nums_old[$n] ?");
 					return ($nums_new[$n] < $nums_old[$n]
 					    ? 0 : -1);
 				} else {
+					#debug(__PACKAGE__, undef,
+					#    "$first_new > $first_old : -1");
 					return -1;
 				}
 			}
 		}
 
-		# Otherwise, compare values numerically
-		# debug(__PACKAGE__, undef, "vercompare "
-		#     . 0+$nums_new[$n]." <> ".0+$nums_old[$n]);
-		return 1 if (0+$nums_new[$n] > 0+$nums_old[$n]);
-		return 0 if (0+$nums_new[$n] < 0+$nums_old[$n]);
+		# Compare values numerically
+		$num_new = 0+$nums_new[$n];
+		$num_old = 0+$nums_old[$n];
+		#debug(__PACKAGE__, undef, "num compare $num_new / $num_old");
+		return 1 if ($num_new > $num_old);
+		return 0 if ($num_new < $num_old);
+
+		# On equal values, compare suffix if any
+		if ($nums_new[$n] =~ /[^\d]/ || $nums_old[$n] =~ /[^\d]/) {
+			my $cmp;
+			$nums_new[$n] =~ s/\d*$num_new//;
+			$nums_old[$n] =~ s/\d*$num_old//;
+			#debug(__PACKAGE__, undef, "suffix compare " .
+			#    $nums_new[$n]." / ".$nums_old[$n]);
+			$cmp = $nums_new[$n] cmp $nums_old[$n];
+			return 0 if ($cmp < 0);
+			return 1 if ($cmp > 0);
+		}
 	}
 
 	# Handle versions like 1.0_suffix; strip away any hyphens or underbars.
