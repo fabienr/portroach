@@ -143,15 +143,15 @@ $sql{ports_restrict_port_count} =
         FROM RoachData
        WHERE fullpkgpath like ?);
 
+$sql{ports_count_ports} =
+    q(SELECT COUNT(FULLPKGPATH) FROM RoachData);
+
 $sql{portdata_insert} =
 	q(INSERT
 	    INTO portdata (name, cat, distname, ver, comment,
 	         distfiles, sufx, mastersites, maintainer,
                  pcfg_comment, homepage, method, basepkgpath, fullpkgpath)
 	  VALUES (?,?,?,?,?,?,?,?,?,?,?,0,?,?));
-
-$sql{sqlports_count_ports} =
-    q(SELECT COUNT(FULLPKGPATH) FROM RoachData);
 
 $sql{portconfig_update} =
 	q(UPDATE portdata
@@ -383,7 +383,7 @@ $sql{portdata_fullpkgpaths} =
     q(SELECT id, fullpkgpath
 	FROM portdata);
 
-$sql{sqlports_check_fullpkgpath} =
+$sql{ports_check_fullpkgpath} =
     q(SELECT FULLPKGPATH FROM _Paths WHERE FULLPKGPATH like ?);
 
 # Misc.

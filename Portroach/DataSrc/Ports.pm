@@ -121,9 +121,9 @@ sub BuildDB
 	# Query SQLports for all the information we need. We don't care about
 	# restrictions for now as this step basically copies sqlports. Check()
 	# will handle any restrictions instead.
-	prepare_sql($sdbh, \%ssths, qw(sqlports_count_ports));
-	$ssths{sqlports_count_ports}->execute or die DBI->errstr;
-	$num_ports = $ssths{sqlports_count_ports}->fetchrow_array();
+	prepare_sql($sdbh, \%ssths, qw(ports_count_ports));
+	$ssths{ports_count_ports}->execute or die DBI->errstr;
+	$num_ports = $ssths{ports_count_ports}->fetchrow_array();
 
 	print "\n" unless ($num_ports < 1 or !$settings{verbose});
 

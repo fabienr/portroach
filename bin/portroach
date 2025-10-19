@@ -1826,7 +1826,7 @@ sub Prune
 
     $dbh = connect_db();
     prepare_sql($dbh,  \%sths,  qw( portdata_fullpkgpaths delete_removed portdata_outdate ));
-    prepare_sql($sdbh, \%ssths, qw( sqlports_check_fullpkgpath ));
+    prepare_sql($sdbh, \%ssths, qw( ports_check_fullpkgpath ));
 
     print "-- [ Pruning removed ports ] -------------------------------------------\n";
 
@@ -1835,8 +1835,8 @@ sub Prune
     # Go through all our pkgpaths, and remove anything which cannot be found in SQLports
     $prune = 0;
     while (my $port = $sths{portdata_fullpkgpaths}->fetchrow_hashref) {
-	$ssths{sqlports_check_fullpkgpath}->execute($port->{fullpkgpath});
-        unless (my ($match) = $ssths{sqlports_check_fullpkgpath}->fetchrow_array) {
+	$ssths{ports_check_fullpkgpath}->execute($port->{fullpkgpath});
+        unless (my ($match) = $ssths{ports_check_fullpkgpath}->fetchrow_array) {
             if ($settings{precious_data}) {
                 info(0, $port->{fullpkgpath}, 'not removed (precious_data)');
                 next;
