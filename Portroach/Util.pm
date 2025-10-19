@@ -77,6 +77,8 @@ our @EXPORT = qw(
 	&extractdirectories
 	&extractsubdirectories
 	&extractsuffix
+	&extractversion
+	&extractgit
 	&tobasepkgpath
 	&fullpkgpathtoport
 	&fullpkgpathtoleaf
@@ -1146,6 +1148,118 @@ sub extractsuffix
 	my $sufx = shift;
 	return unless ($sufx =~ s/^(.*?)((\.($ext_regex))+)$/$2/i);
 	return $sufx;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: extractversion()
+# Desc: Extract version from a path, need port to handle names' prefix
+#
+# Args: $port   - Port hash which contains name, fullpkgpath, homepage
+#       $path   - String to extract version from
+#
+# Retn: $ver    - version string or undef
+#------------------------------------------------------------------------------
+
+sub extractversion
+{
+	my ($port, $path) = @_;
+	my ($dist_q, $chop_re, $chop_q, $re, @paths);
+
+	$chop_re = $settings{build_chop};
+	$dist_q = porttoregex($port, []); # XXX should be lazy, try being strict
+	$chop_q = qr/[\.\-\_\+]?(?:$chop_re|$dist_q|$lang_regex)[\.\-\_\+]?/x;
+	$re = qr:($verprfx_regex)?($chop_q)*+((?<!\d)\.|\-|\_)?
+	    ($verprfx_regex)?($verlike_regex)($chop_q)*+:xi;
+	#debug(__PACKAGE__, $port, "extract $path version $re");
+	if ($path =~ /\//) {
+		@paths = split /\//, $path;
+	} else {
+		push (@paths, $path);
+	}
+	foreach $path (@paths) {
+		return $5 if ($path =~ m:^$re$:);
+	}
+	return undef;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: extractgit()
+# Desc: Extract tags(versions) from a git url, need port to handle names' prefix
+#
+# Args: $port    - Port hash which contains name, fullpkgpath, homepage
+#       $giturl  - Url to use in order to list tags remotly
+#       $fileurl - Url to use in order to fetch matching tag archive
+#       \$files  - Where to put filenames found.
+#
+# Retn: $ntag   - -1 on error otherwise number of tags found
+#------------------------------------------------------------------------------
+
+sub extractgit
+{
+	my ($port, $giturl, $fileurl, $files) = @_;
+	my ($gitcmd, $out, $err, $rc, @tags);
+
+# XXX extract date from git, for later use with better site handler api
+#https://stackoverflow.com/questions/65729722/git-ls-remote-tags-how-to-get-date-information
+# git init repo
+# cd repo
+# git config extensions.partialClone true
+# git remote add origin https://github.com/shopify/sarama
+# time git fetch --filter=blob:none --tags --depth=1 origin
+# git tag -l | xargs -t -n1 git log --format=%cd
+
+	$gitcmd = "GIT_TERMINAL_PROMPT=0 /usr/local/bin/git".
+	    " -c 'versionsort.suffix=-' ls-remote".
+	    " --tags --sort='v:refname'";
+	debug(__PACKAGE__, $port, "$gitcmd $giturl");
+	($out, $err, $rc) = capture {
+		system("$gitcmd $giturl");
+	};
+	if ($rc != 0 or $err) {
+		$err .= '\n' if ($err !~ /\n$/g);
+		info(1, $port->{fullpkgpath}, strchop($giturl, 60)
+		    . ': ' . "$rc, $err");
+		return -1;
+	}
+	foreach my $output (reverse(split /^/m, $out)) {
+		my ($commit, $tag) = split(/\s+/, $output);
+		next if ($tag =~ /\^\{\}$/);
+		$tag =~ s/refs\/tags\///;
+		#debug(__PACKAGE__, $port, "tag $tag");
+		push(@tags, $tag);
+	}
+	foreach my $tag (@tags) {
+		my ($ver, $version);
+		$ver = lc $tag;
+
+		debug(__PACKAGE__, $port, "replace ver/ver by ver+ver -> $ver")
+		    if ($ver =~ s/(?=$verlike_regex)\/(?=$verlike_regex)/\+/g);
+
+		debug(__PACKAGE__, $port, "replace / by _ -> $ver")
+		    if ($ver =~ s/\//\_/g);
+
+		$version = extractversion($port, $ver);
+		debug(__PACKAGE__, $port, "extract $ver -> '$version'")
+		    if ($ver ne $version);
+		$ver = $version;
+
+		debug(__PACKAGE__, $port, "trim (v|r) marker -> $ver")
+		    if ($ver =~ s/^$verprfx_regex//);
+
+		# use hardcoded sufx instead of $port->{sufx}
+		# bsd.port.mk EXTRACT_SUFX ?= .tar.gz
+		# font.port.mk EXTRACT_SUFX ?=	.zip
+		$ver = $fileurl . $tag . ".tar.gz%%$ver";
+		push(@$files, $ver);
+
+		# XXX lazy matching ?
+		# $tag = vertoregex($port->{ver});
+		debug(__PACKAGE__, $port, "stop loading tag, old found $ver")
+		    if ($ver eq $port->{ver});
+		last if ($ver eq $port->{ver});
+	}
 }
 
 
