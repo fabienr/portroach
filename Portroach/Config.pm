@@ -196,7 +196,7 @@ sub ParseConfigFile
 
 	$lineno = 0;
 
-	open my $cf, "<$filename" or die "Can't open config file";
+	open my $cf, "<$filename" or die "Can't open config file $filename";
 
 	while (my $line = <$cf>)
 	{
