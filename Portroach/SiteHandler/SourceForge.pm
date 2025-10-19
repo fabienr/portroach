@@ -1,5 +1,6 @@
 #------------------------------------------------------------------------------
 # Copyright (C) 2010, Shaun Amott <shaun@inerd.com>
+# Copyright (C) 2025 Fabien Romano <fabien@openbsd.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -80,7 +81,7 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	return ($url =~ /^https?:\/\/.*\.sourceforge\.net/);
+	return ($url =~ m:^https?\://(.*\.)?sourceforge\.net:);
 }
 
 
@@ -96,10 +97,12 @@ sub CanHandle
 sub GetName
 {
 	my $self = shift;
+	my ($url) = @_;
 
-	my ($ver) = @_;
-
-	if ($ver =~ m:^https?\://.*\.sourceforge\.net/sourceforge/(.*?)\/:) {
+	my $q = qr:sourceforge\.net/(sourceforge|projects|p)/:;
+	if ($url =~ m:$q([^/]*)(/|$):) {
+		return $2;
+	} elsif ($url =~ m:^https?\://(.*)\.sourceforge\.net/:) {
 		return $1;
 	} else {
 		return undef;
@@ -116,6 +119,8 @@ sub GetName
 # Args: $url     - URL we would normally fetch from.
 #       \%port   - Port hash fetched from database.
 #       \@files  - Array to put files into.
+#       \@sites    - Array to put new site found into.
+#       \@homepages- Array to put new homepage found into.
 #
 # Retn: $success - False if file list could not be constructed; else, true.
 #------------------------------------------------------------------------------
@@ -124,26 +129,27 @@ sub GetFiles
 {
 	my $self = shift;
 
-	my ($url, $port, $files) = @_;
+	my ($url, $port, $files, $sites, $homepages) = @_;
 
-	my ($query, $projname, $ua, $resp, $xpath, $items);
+	my ($projname, $ua, $resp, $homepage, $query, $xpath, $items);
 
-	my $q = 'downloads\.sourceforge\.net\/(sourceforge|project)\/';
-	if ($url =~ /$q([^\/]*)\//) {
-		$projname = $2;
-	} elsif ($url =~ /^https?:\/\/(.*)\.sourceforge\.net\//) {
-		$projname = $1;
-	} else {
+	$projname = $self->GetName($url);
+	if (!$projname) {
 		print STDERR "$port->{fullpkgpath}: $url, "
 		    . "no projname found in url\n";
 		return 0;
 	}
 
+	$ua = lwp_useragent();
+
+	$resp = $ua->get("https://$projname.sourceforge.net/");
+	$homepage = $resp->base;
+	push @$homepages, $homepage;
+	info(1, $port->{fullpkgpath}, "push homepage $homepage");
+
 	# Find the RSS feed for this project.
 	$query = "http://sourceforge.net/projects/$projname/rss?limit=1000";
-
 	debug(__PACKAGE__, $port, "GET $query");
-	$ua = lwp_useragent();
 	$resp = $ua->get($query);
 
 	if (!$resp->is_success || $resp->status_line !~ /^2/) {
@@ -165,15 +171,19 @@ sub GetFiles
 	}
 
 	foreach my $item ($feed->entries) {
-		my ($file, $url);
-
-		$file = "/project/$projname" . $item->title;
-		$url = $item->link;
-
-		next if ($url =~ /\/$/);
+		# XXX link to /download instead of direct fetch (ex: '?viasf=1')
+		my ($file, $version);
+		next if ($item->link =~ /\/$/);
+		$file = $item->title;
+		$file =~ s/.*\/([^\/]*)$/$1/;
+		$version = lc $file;
+		$version =~ s/$ext_regex//;
+		$version = extractversion($port, $version);
+		debug(__PACKAGE__, $port, "extract $file -> '$version'")
+		    if ($version);
 
 		# Note this file.
-		push @$files, $file;
+		push @$files, $item->link.'__'.$file.'%%'.$version;
 	}
 
 	return 1;
