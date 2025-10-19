@@ -75,7 +75,6 @@ our @EXPORT = qw(
 	&extractpages
 	&extracthandlers
 	&extractdirectories
-	&extractsubdirectories
 	&extractsuffix
 	&extractversion
 	&extractgit
@@ -1087,46 +1086,65 @@ sub extracthandlers
 # Func: extractdirectories()
 # Desc: Extract directories from a mastersite index, going down the path only.
 #
-# Args: $resp    - Response from master site request.
-#       \$dirs   - Where to put directories found, only full path, ^/
+# Args: $resp    - Response from site request.
 #       $site    - Actual, full path on the site to resolve/filter link.
+#       \$dirs   - Where to put directories found.
+#       $verlike - 0|1 return path matching or not a version schema
 #
 # Retn: $success - true/false
 #------------------------------------------------------------------------------
 
-sub extractsubdirectories
+sub extractdirectories
 {
-	my ($resp, $dirs, $site) = @_;
+	my ($resp, $site, $dirs, $verlike) = @_;
+	my ($host_q, $path_q, $base, $html, $link);
 
-	my $host_q = quotemeta $site->host;
-	my $path_q = quotemeta $site->path;
+	$host_q = $site->host;
+	$host_q = s/.*\.([^\.]*?\.[^\.])$/$1/; # check only for top domain
+	$host_q = quotemeta $host_q;
+	$path_q = quotemeta $site->path;
+	$base = $resp->base;
+	$base =~ s/[^\/]+$//;
 
-	foreach (split "<", $resp->content) {
-		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/i);
-		my $link = $2;
-		# check same host, extract actual path
+	foreach $html (split "<", $resp->content) {
+		next unless ($html =~ /^a\s.*(?<=\s)href\s*=\s*('|")(.*?)\1/i);
+		$link = $2;
+		#debug(__PACKAGE__, undef, "$link =~ /\/\$/")
+		#    unless ($link =~ /\/$/);
+		next unless $link =~ /\/$/;
+		# check for version
+		#debug(__PACKAGE__, undef, "$link =~ /$verlike_regex/i")
+		#    if (!$verlike and $link =~ /$verlike_regex/i);
+		next if (!$verlike and $link =~ /$verlike_regex/i);
+		#debug(__PACKAGE__, undef, "$link !~ /$verlike_regex/i")
+		#    if ($verlike and $link !~ /$verlike_regex/i);
+		next if ($verlike and $link !~ /$verlike_regex/i);
+
 		if ($link !~ /^(.*?:\/\/|\/)/) {
-			debug(__PACKAGE__, undef,
-			    "$link => ".$resp->base.".$link");
-			$link = $resp->base.$link;
+			#debug(__PACKAGE__, undef, "$link => ".$base.".$link");
+			$link = $base.$link;
 		}
 		if ($link =~ /^.*?:\/\//) {
-			next if ($link !~ /^.*?:\/\/$host_q\//i);
-			$link =~ s/^.*?:\/\/$host_q\//\//i;
+			next if ($link !~ /^.*?:\/\/[^\/]*$host_q\//i);
+			#debug(__PACKAGE__, undef,
+			#    "skip, $link !~ s/^.*?:\/\/[^\/]*$host_q\//\//i");
+			$link =~ s/^.*?:\/\/[^\/]*$host_q\//\//i;
 		}
 		$link = path_absolute($link);
 		$link =~ s/[^\/]+$//;
 		if ($link eq $site->path) {
-			debug(__PACKAGE__, undef,
-			    "skip, $link eq ".$site->path);
+			#debug(__PACKAGE__, undef,
+			#    "skip, $link eq ".$site->path);
 			next;
 		}
 		if ($link !~ /^$path_q[^\/]+/i) {
-			debug(__PACKAGE__, undef,
-			    "skip, $link !~ /^$path_q\[^\/]+/i");
+			#debug(__PACKAGE__, undef,
+			#    "skip, $link !~ /^$path_q\[^\/]+/i");
 			next;
 		}
+
 		next if (grep { $_ eq $link } @$dirs);
+		#debug(__PACKAGE__, undef, "push dir $link");
 		push @$dirs, $link;
 	}
 

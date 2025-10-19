@@ -1,5 +1,7 @@
 #------------------------------------------------------------------------------
+# Copyright (C) 2005-2011, Shaun Amott. All rights reserved.
 # Copyright (C) 2015,2020 Jasper Lievisse Adriaanse <jasper@openbsd.org>
+# Copyright (C) 2025 Fabien Romano <fabien@openbsd.org>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -68,11 +70,12 @@ sub CanHandle
 
 #------------------------------------------------------------------------------
 # Func: GetFiles()
-# Desc: Extract a list of files from the given URL. Simply query the API.
+# Desc: Extract a list of files from the given URL.
 #
-# Args: $url     - URL we would normally fetch from.
-#       \%port   - Port hash fetched from database.
-#       \@files  - Array to put files into.
+# Args: $url      - URL we would normally fetch from.
+#       \%port    - Port hash fetched from database.
+#       \@files   - Array to put files into.
+#       $path_ver - Version found in url, upper directory to inspect.
 #
 # Retn: $success - False if file list could not be constructed; else, true.
 #------------------------------------------------------------------------------
@@ -83,24 +86,29 @@ sub GetFiles
 
 	my ($url, $port, $files, $path_ver) = @_;
 
-	my ($ua, $resp, $host, $rc, $link, @dirs, $dir, @tmp, $site, $path,
-	    $path_ver_q, $root_resp, $depth_limit);
+	my ($ua, $resp, $host, $rc, $found, $link, @dirs, @fetched, $dir,
+	    $site, $path, $path_ver_q, $oldsemantic, $root_resp, $depth_limit,
+	    @handlers);
 
 	$ua = lwp_useragent();
 	$resp = $ua->get($url);
 	$host = $url->host;
 	$host = s/.*\.([^\.]*?\.[^\.])$/$1/; # check only for top domain
 	$rc = 1; # return success by default
+	$found = 0;
 
 	if ($resp->is_success) {
 		my @tmp;
-		extractfilenames($resp->content, $port->{sufx}, \@tmp);
+		$resp->content($resp->content =~ s/\R/ /gr);
+		$resp->content($resp->content =~ s/\s+/ /gr);
+		extractfilenames($resp, $port->{sufx}, \@tmp);
 		foreach $link (@tmp) {
 			if ($link =~ /^https?:\/\// && $link !~ /$host/) {
 				debug(__PACKAGE__,$port,"skip $link !~ $host");
 				next;
 			}
 			debug(__PACKAGE__, $port, "push $link");
+			$found = 1;
 			push @$files, $link;
 		}
 		info(1, $port->{fullpkgpath}, $url->host,
@@ -117,68 +125,109 @@ sub GetFiles
 		$rc = 0;
 	}
 
-	# XXX indexsite from Makefile may prevent path_ver detection
-	# return 1 unless($path_ver);
-
 	# Directory listing is a success: investigate $path_ver variations...
 
-	$site = $url->clone;
+	$site = $resp->base;
 	$path = $site->path;
 	if ($path_ver) {
 		$path_ver_q = quotemeta $path_ver;
-		$path =~ s/($verprfx_regex)?$path_ver_q\/.*//;
-		$site->path($path);
-		debug(__PACKAGE__, $port, "switch to $path");
+		$path =~ s:/[^/]*?$path_ver_q[^/]*?/.*:/:g;
+		debug(__PACKAGE__, $port, "switch to $path (=~ $path_ver)");
 	}
-
-	$resp = $ua->get($site);
-
-	if ($resp->is_success) {
-		$root_resp = $resp;
-		extractdirectories($resp->content, \@dirs);
-		debug(__PACKAGE__, $port, "no dirs, $site") if (!@dirs);
-	} else {
-		info(1, $port->{fullpkgpath}, strchop($site, 60)
-		    . ': ' . $resp->status_line);
-		return $rc;
-	}
+	push @dirs, $path;
 
 	# Investigate sibling version matches
-	my $found = 0;
-	foreach $dir (@dirs) {
-		my (@tmp, $dir_v, $dir_maj, $new_path);
+	$oldsemantic = () = $port->{ver} =~ /[\.\-\_]/g;
+	while ($dir = shift(@dirs)) {
+		my ($newsemantic, @tmp, $dir_v, $dir_maj, $new_path);
+
+		next if (grep { $_ eq $dir } @fetched);
+		push @fetched, $dir;
+
+		# Check version, filter bad matches early
+		$dir_v = extractversion($port, lc $dir);
+		if ($root_resp) {
+			if (!isversion($dir_v, $port->{ver})) {
+				debug(__PACKAGE__, $port,
+				    "$dir_v !~ $port->{ver}, skip dir $dir");
+				next;
+			}
+			# Check version pattern for major number.
+			# If found and the new version isn't greater,
+			#  check if major number match.
+			# Otherwise, skip the path.
+			$newsemantic = () = $dir_v =~ /[\.\-\_]/g;
+			$dir_maj = $1 if ($dir_v =~ /^(\d+)[\.\-\_].*/);
+			if ($oldsemantic == $newsemantic) {
+				if (!vercompare($dir_v, $port->{ver})) {
+					debug(__PACKAGE__, $port,
+					    "$dir_v < $port->{ver}, "
+					    . "skip version $dir");
+					next;
+				}
+			} elsif (length $dir_maj &&
+			    !vercompare($dir_v, $port->{ver}) &&
+			    $port->{ver} !~ /^$dir_maj\./) {
+				debug(__PACKAGE__, $port,
+				    "$dir_v < $port->{ver} !~ /^$dir_maj/, "
+				    . "skip version $dir");
+				next;
+			}
+		}
+
+		$site->path($dir);
+		debug(__PACKAGE__, $port, "inspect version $dir");
+
+		$resp = $ua->get($site);
+		if (!$resp->is_success) {
+			info(1, $port->{fullpkgpath}, strchop($site, 60)
+			    . ': ' . $resp->status_line);
+			return $rc;
+		}
+		$resp->content($resp->content =~ s/\R/ /gr);
+		$resp->content($resp->content =~ s/\s+/ /gr);
+
+		if (!$root_resp) {
+			$root_resp = $resp;
+			extractdirectories($resp, $site, \@dirs, 1);
+			debug(__PACKAGE__, $port, "no dirs, $site") if (!@dirs);
+		}
+
+		extractfilenames($resp, $port->{sufx}, \@tmp);
+		debug(__PACKAGE__, $port, "no files, $site") if (!@tmp);
+
+		foreach my $link (@tmp) {
+			if ($link =~ /^https?:\/\// && $link !~ /$host/) {
+				debug(__PACKAGE__,$port,"skip $link !~ $host");
+				next;
+			} elsif ($link !~ /^(https?:\/\/|\/)/) {
+				$link = $site->path . "$link";
+			}
+			next if (grep { $_ eq $link } @$files);
+			debug(__PACKAGE__, $port, "push $link");
+			$found = 1;
+			push @$files, "$link";
+		}
+		undef @tmp;
 
 		last unless $path_ver_q; # skip without version
 		debug(__PACKAGE__, $port, "sibling, $dir");
 
-		# Check version, filter bad matches early
-		$dir_v = $dir;
-		$dir_v =~ s:^(.*/)?($verprfx_regex)?($verlike_regex)/.*$:$3:i;
-		if (!isversion($dir_v, $port->{ver})) {
-			debug(__PACKAGE__, $port, "$dir_v !~ $port->{ver}, "
-			    . "skip dir $dir");
-			next;
-		}
-		# Check version pattern for major number. If found and the new
-		# version isn't greater, check if major number match.
-		# Otherwise, skip the path.
-		$dir_maj = $1 if ($dir_v =~ /(\d+)\..*/);
-		if ( length $dir_maj && !vercompare($dir_v, $port->{ver}) &&
-		    $port->{ver} !~ /^$dir_maj/) {
-			debug(__PACKAGE__, $port,
-			    "$dir_v < $port->{ver} !~ /^$dir_maj/, "
-			    . "skip version $dir");
-			next;
-		}
-
 		# Check same site with alternative path
 		$new_path = $url->path;
 		$new_path =~ s/$path_ver_q/$dir_v/;
+
+		next if (grep { $_ eq $new_path } @fetched);
+		push @fetched, $new_path;
+
 		$site->path($new_path);
+		debug(__PACKAGE__, $port, "inspect sibling $new_path");
 
 		$resp = $ua->get($site);
 		if ($resp->is_success) {
-			extractfilenames($resp->content, $port->{sufx}, \@tmp);
+			$resp->content($resp->content =~ s/\R/ /gr);
+			$resp->content($resp->content =~ s/\s+/ /gr);
+			extractfilenames($resp, $port->{sufx}, \@tmp);
 			debug(__PACKAGE__, $port, "no files, $site") if (!@tmp);
 		} else {
 			# As we previously got an answer, this is not a failure
@@ -192,13 +241,19 @@ sub GetFiles
 			} elsif ($link !~ /^(https?:\/\/|\/)/) {
 				$link = $site->path . "$link";
 			}
+			next if (grep { $_ eq $link } @$files);
 			debug(__PACKAGE__, $port, "push $link");
 			$found = 1;
 			push @$files, "$link";
 		}
 	}
 
-	return 1 if($found);
+	return 1 if ($found);
+	if (!$root_resp) {
+		# XXX WHY ?
+		info(1, $port->{fullpkgpath}, "undefined root_resp !");
+		return 0;
+	}
 
 	# No files found, crawl down the path
 	undef @dirs;
@@ -206,7 +261,7 @@ sub GetFiles
 	$site->path($path);
 	$depth_limit = $path =~ tr/\///;
 	$depth_limit += 5; # XXX random guess, five should be enough
-	extractsubdirectories($root_resp, \@dirs, $site);
+	extractdirectories($root_resp, $site, \@dirs, 0);
 	debug(__PACKAGE__, $port, "no subdir, $site") if (!@dirs);
 
 	while ($dir = shift(@dirs)) {
@@ -221,15 +276,30 @@ sub GetFiles
 
 		$site->path($dir);
 		$resp = $ua->get($site);
-		if ($resp->is_success) {
-			extractfilenames($resp->content, $port->{sufx}, \@tmp);
-			debug(__PACKAGE__, $port, "no files, $site") if (!@tmp);
-		} else {
+		if (!$resp->is_success) {
 			# As we previously got an answer, this is not a failure
 			info(1, $port->{fullpkgpath}, strchop($site, 60)
 			    . ': ' . $resp->status_line);
 			next;
 		}
+		$resp->content($resp->content =~ s/\R/ /gr);
+		$resp->content($resp->content =~ s/\s+/ /gr);
+
+		# ... continue crawling ...
+		extractdirectories($resp, $site, \@dirs, 0);
+		debug(__PACKAGE__, $port, "no subdir, $site") if (!@tmp);
+		foreach my $link (@tmp) {
+			next if (grep { $_ eq $link } @dirs);
+			debug(__PACKAGE__, $port, "DIR $link");
+			push @dirs, "$link";
+		}
+		undef @tmp;
+
+		next if (grep { $_ eq $dir } @fetched);
+		push @fetched, $dir;
+
+		extractfilenames($resp, $port->{sufx}, \@tmp);
+		debug(__PACKAGE__, $port, "no files, $site") if (!@tmp);
 
 		foreach my $link (@tmp) {
 			if ($link =~ /^https?:\/\// && $link !~ /$host/) {
@@ -238,18 +308,9 @@ sub GetFiles
 			} elsif ($link !~ /^(https?:\/\/|\/)/) {
 				$link = $site->path . "$link";
 			}
+			next if (grep { $_ eq $link } @$files);
 			debug(__PACKAGE__, $port, "push $link");
 			push @$files, "$link";
-		}
-
-		# ... continue crawling ...
-		undef @tmp;
-		extractsubdirectories($resp, \@tmp, $site);
-		debug(__PACKAGE__, $port, "no subdir, $site") if (!@tmp);
-		foreach my $link (@tmp) {
-			next if (grep { $_ eq $link } @dirs);
-			debug(__PACKAGE__, $port, "DIR $link");
-			push @dirs, "$link";
 		}
 	}
 
