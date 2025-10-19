@@ -1662,11 +1662,11 @@ sub fullpkgpathtoleaf
 
 #------------------------------------------------------------------------------
 # Func: fullpkgpathtosubcat()
-# Desc: Extract the port sub-category from cat/subcat/port.
+# Desc: Extract the port sub-category from cat/sub/cat/port.
 #
 # Args: $fullpkgpath - Package path for a specific port variation.
 #
-# Retn: $cat         - undef or the sub-category of the port.
+# Retn: $cat         - undef or sub-categories of the port.
 #------------------------------------------------------------------------------
 
 sub fullpkgpathtosubcat
@@ -1682,9 +1682,9 @@ sub fullpkgpathtosubcat
 	# There is no sub-category to extract, return undef
 	return if ($cat !~ /\//);
 
-	$cat =~ s/\/.*$//g;
+	$cat =~ s/\/[^\/]*$//g;
 
-	return $cat;
+	return split /\//, $cat;
 }
 
 
