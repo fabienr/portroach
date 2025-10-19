@@ -55,6 +55,7 @@ our @EXPORT = qw(
 	$beta_regex
 	$month_regex
 	$ext_regex
+	$archive_regex
 	$verprfx_regex
 	$verlike_regex
 	$lang_regex
@@ -107,7 +108,7 @@ our @EXPORT = qw(
 #------------------------------------------------------------------------------
 
 our (%settings, @months, $date_regex, $beta_regex, $month_regex, $ext_regex,
-    $verprfx_regex, $verlike_regex, $lang_regex);
+    $archive_regex, $verprfx_regex, $verlike_regex, $lang_regex);
 
 my %beta_types;
 
@@ -162,10 +163,13 @@ $date_regex  = qr/(?<!\d)(?:\d{2,4})?(?<SEP>[\.\-\_]?)
 
 $beta_regex = join '|', map +($beta_types{$_}->{re}), keys %beta_types;
 
-$ext_regex = qr/(?:l|t?b|t?g|t?x)?z(?:2|st)?|
-    langpack|xpi|pl|uu|txt|bin|c|dictd|dtd|exe|F90|gem|html|ins|jar|kar|mp3|
-    mmdb|otf|pdf|phar|rar|rpm|run|sfc|shar|spl|tar|tgz|ttf|txi|txt|uqm|war|
-    zip/xi;
+$ext_regex = qr/(\.(
+    (?:l|t?b|t?g|t?x)?z(?:2|st)?|
+    langpack|xpi|pl|uu|txt|bin|c|dictd|dtd|exe|F90|gem|html|ins|jar|kar|
+    md5(?:sum)?|mp3|mmdb|otf|pdf|phar|rar|rpm|run|sfc|shar|sha\d*(?:sum)?|spl|
+    tar|tgz|ttf|txi|txt|uqm|war|zip
+    ))+$/xi;
+$archive_regex = qr/(?:l|t?b|t?g|t?x)?z(?:2|st)?|rar|tar|tgz|zip/i;
 
 $verprfx_regex = qr/(?:v|ver|version|r|rel|release)(?:[\.\-\_]|(?=\d))/;
 
@@ -1039,7 +1043,7 @@ sub checkevenodd
 # Func: extractfilenames()
 # Desc: Extract filenames (and dates, where possible) from a mastersite index
 #
-# Args: $data    - Data from master site request.
+# Args: $resp    - Response from site request.
 #       $sufx    - Distfile suffix (e.g. ".tar.gz")
 #       \$files  - Where to put filenames found.
 #
@@ -1048,17 +1052,51 @@ sub checkevenodd
 
 sub extractfilenames
 {
-	my ($data, $sufx, $files) = @_;
+	my ($resp, $sufx, $files) = @_;
+	my ($base, $html, $link, $linkname, $file);
 
-	$sufx = quotemeta $sufx;
+	if ($sufx =~ /(\.($archive_regex))+$/) {
+		$sufx = qr/(\.($archive_regex))+/;
+	} else {
+		$sufx = quotemeta $sufx;
+	}
+	$base = $resp->base;
+	$base =~ s/[^\/]+$//;
 
-	foreach (split "<", $data) {
-		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/i);
-		my $link = $2;
-		next unless $link =~ /$sufx$/i;
-		my $file = uri_unescape($link);
-		debug(__PACKAGE__, undef, "unescape $link -> $file")
-		    if ($file ne $link);
+	foreach $html (split "<", $resp->content) {
+		#debug(__PACKAGE__, undef, "link $html ?");
+		next unless (
+		    $html =~ /^a\s.*(?<=\s)href\s*=\s*['"]?(.*?)['"]?[\s>]/i);
+		$link = $1;
+		$link =~ s/\s+//g;
+		$linkname = $html if ($html =~ /\>/);
+		$linkname =~ s/.*\>([^\>]*)$/$1/;
+		#debug(__PACKAGE__, undef, "file $link ($linkname) ?");
+		if ($link !~ /$sufx$/i && $linkname !~ /$sufx$/i) {
+			#debug(__PACKAGE__, undef, "$linkname !~ /$sufx\$/i")
+			#    unless ($linkname =~ /$sufx$/i);
+			#debug(__PACKAGE__, undef, "$link !~ /$sufx\$/i")
+			#    unless ($link =~ /$sufx$/i);
+			next;
+		}
+		$linkname =~ s/\s+//g;
+		$link = decode_entities($link);
+		if ($link !~ /^(.*?:\/\/|\/)/) {
+			#debug(__PACKAGE__, undef, "$link => ".$base.".$link");
+			$link = $base.$link;
+		}
+		$link = path_absolute($link);
+		$file = uri_unescape($link);
+		#debug(__PACKAGE__, undef, "unescape $link -> $file")
+		#    if ($file ne $link);
+		if ($linkname =~ /$sufx$/i && index($link, $linkname) == -1) {
+			# append __linkname if it differ from link but has sufx
+			# XXX experimental, regression ?
+			#debug(__PACKAGE__,undef,"linkname $file __ $linkname");
+			$file .= '__' . $linkname;
+		}
+		next if (grep { $_ eq $file } @$files);
+		#debug(__PACKAGE__, undef, "push filename $file");
 		push @$files, $file;
 	}
 
@@ -1252,7 +1290,7 @@ sub extractdirectories
 sub extractsuffix
 {
 	my $sufx = shift;
-	return unless ($sufx =~ s/^(.*?)((\.($ext_regex))+)$/$2/i);
+	return unless ($sufx =~ s/^(.*?)($ext_regex)$/$2/i);
 	return $sufx;
 }
 
