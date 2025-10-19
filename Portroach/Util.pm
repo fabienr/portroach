@@ -257,55 +257,70 @@ sub isversion
 	my $vera = shift;
 	my $verb = shift;
 
+	# XXX check for go 0.0.0.date.commitid string ?
 	# XXX discard HASH for now ( new commit = new version ? )
 	if ($vera =~ /[;=\?\[\]\(\)#]/ || ($vera !~ /^$date_regex$/ &&
-		$vera =~ /^[0-9a-f]{10,40}$/)) {
+	    $vera =~ /^[0-9a-f]{10,40}$/)) {
 		return 0;
 	}
 	if ($verb =~ /[;=\?\[\]\(\)#]/ || ($verb !~ /^$date_regex$/ &&
-		$verb =~ /^[0-9a-f]{10,40}$/)) {
+	    $verb =~ /^[0-9a-f]{10,40}$/)) {
 		return 0;
 	}
 
 	# Valid version are two digits schema, date, or single digit one letter
-	if ($vera =~ /^\d+[\.\-\_]\d+/) {
+	if ($vera =~ /^$date_regex/) { # XXX /^...$/ <- whole match ?
 		return 1 unless ($verb);
-		return 1 if ($verb =~ /^\d+[\.\-\_]\d+/);
+		#debug(__PACKAGE__, undef, "isversion date $vera ~ $verb ?");
+		return 1 if ($verb =~ /^$date_regex/);
+		return 0;
+	} elsif ($vera =~ /^($beta_regex)?\d+[\.\-\_]\d+/) {
+		return 1 unless ($verb);
+		#debug(__PACKAGE__, undef, "isversion ver $vera ~ $verb ?");
+		return 0 if ($verb =~ /^$date_regex$/);
+		return 1 if ($verb =~ /^($beta_regex)?\d+[\.\-\_]\d+/);
 		$verb = quotemeta $verb;
 		return 1 if ($vera =~ /^$verb/); # 7.0.1 ~ 7
 		return 0;
-	} elsif ($vera =~ /^$date_regex$/) {
+	} elsif ($vera =~ /^($beta_regex)?\d+(\D{,2}\d{,2})?([\.\-\_].+)?$/) {
 		return 1 unless ($verb);
-		return 1 if ($verb =~ /^$date_regex$/);
-		return 0;
-	} elsif ($vera =~ /^\d+(\D{,2}\d{,2})?([\.\-\_].+)?$/) {
-		return 1 unless ($verb);
-		return 1 if ($verb =~ /^\d+(\D{,2}\d{,2})?([\.\-\_].+)?$/);
+		#debug(__PACKAGE__, undef, "isversion digit $vera ~ $verb ?");
+		return 1 if ($verb =~
+		    /^($beta_regex)?\d+(\D{,2}\d{,2})?([\.\-\_].+)?$/);
 		return 0;
 	}
 
+	# debug(__PACKAGE__, undef, "discard $vera !~ /^$date_regex/"
+	#     . " !~ /^($beta_regex)?\\d+[\\.\\-\\_]\\d+/"
+	#     . " !~ /^($beta_regex)?\\d+(\\D{,2}\\d{,2})?([\\.\\-\\_].+)?\$/");
 	return 0;
 }
 
 
 #------------------------------------------------------------------------------
 # Func: isbeta()
-# Desc: Determine if a version (or filename) looks like a beta/alpha/dev't
-#       version.
+# Desc: Determine if a version (or filename) looks like a beta** version.
 #
-# Args: $version - Version or full filename.
+# Args: $ver     - Version or full filename.
 #
 # Retn: $isbeta  - Looks like beta?
 #------------------------------------------------------------------------------
 
 sub isbeta
 {
-	my ($version) = @_;
+	my ($ver) = @_;
+
+	$ver =~ s/^(.*?)($ext_regex)$/$1/i;
+	#debug(__PACKAGE__, undef, "BETA $ver =~"
+	#    . " /^($beta_regex)[\\.\\-\\_\\~\\d]/i")
+	#    if ($ver =~ /^($beta_regex)[\.\-\_\~\d]/i);
+	#debug(__PACKAGE__, undef, "BETA $ver =~"
+	#    . " /[\\.\\-\\_\\~\\d]($beta_regex)([\\.\\-\\_\\~\\d]|\$)/i")
+	#    if ($ver =~ /[\.\-\_\~\d]($beta_regex)([\.\-\_\~\d]|$)/i);
 
 	return (
-		# XXX => \.\-\_ add ~ everywhere ?
-		$version =~ /^(.*)[-_~.](?:$beta_regex).*$/gi
-			or $version =~ /^(.*)(?<=\d)(?:$beta_regex).*$/gi
+	    $ver =~ /^($beta_regex)[\.\-\_\~\d]/i or
+	    $ver =~ /[\.\-\_\~\d]($beta_regex)([\.\-\_\~\d]|$)/i
 	);
 }
 
