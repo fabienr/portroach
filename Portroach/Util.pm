@@ -1439,10 +1439,8 @@ sub info
 	my @items = (@_);
 	my ($str, $msg);
 
-	# XXX should fit for non verbose msg ... or not
-	# width is diveded by 2 for eah @str
-	# use at most two: [---30---] [-15-] $msg
-	my $width = 30;
+	# use at most two: [--20--] [--20--] $msg
+	my $width = 20;
 
 	return if ($verbose && !$settings{verbose});
 
@@ -1451,7 +1449,6 @@ sub info
 	foreach (@items) {
 		$str .= ' ' if ($str);
 		$str .= '[' . strchop($_, $width) . ']';
-		$width /= 2;
 	}
 
 	if ($str) {
