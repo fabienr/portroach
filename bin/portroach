@@ -1204,20 +1204,19 @@ sub GenerateHTMLPorts
 	}
 
 	while ($row = $sth->fetchrow_hashref) {
-		if ($row->{ignore}) {
-			$row->{method} = 'X';
-			$row->{newver} = '';
-			$row->{newurl} = '';
+		if ($row->{method} eq METHOD_LIST) {
+			$row->{method} = 'L';
+		} elsif ($row->{method} eq METHOD_GUESS) {
+			$row->{method} = 'G';
+		} elsif ($row->{method} eq METHOD_HANDLER) {
+			$row->{method} = 'S';
+		} elsif ($row->{method} eq METHOD_HOMEPAGE) {
+			$row->{method} = 'H';
 		} else {
-			if ($row->{method} eq METHOD_LIST) {
-				$row->{method} = 'L';
-			} elsif ($row->{method} eq METHOD_GUESS) {
-				$row->{method} = 'G';
-			} elsif ($row->{method} eq METHOD_HANDLER) {
-				$row->{method} = 'S';
-			} else {
-				$row->{method} = '?';
-			}
+			$row->{method} = '?';
+		}
+		if ($row->{ignore}) {
+			$row->{method} .= 'X';
 		}
 
 		if ($row->{newver} && ($row->{ver} ne $row->{newver})) {
@@ -1285,6 +1284,7 @@ sub GenerateHTML
 	    portdata_genmaintainers
 	    portdata_gensites
 	    portdata_selectall_cat
+	    portdata_selectall_discovered
 	    portdata_selectall_limited
 	    portdata_selectall_maintainer
 	    portdata_selectall_outdated
@@ -1515,6 +1515,8 @@ sub GenerateHTML
 
 	print "Creating state pages...\n";
 
+	GenerateHTMLPorts($sths{portdata_selectall_discovered}, "discovered",
+	    $template, \%outdata, "state");
 	GenerateHTMLPorts($sths{portdata_selectall_outdated}, "outdated",
 	    $template, \%outdata, "state");
 	GenerateHTMLPorts($sths{portdata_selectall_unknow}, "unknow",

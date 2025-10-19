@@ -290,6 +290,13 @@ $sql{portdata_selectall_cat} =
 	   WHERE lower(cat) = lower(?)
 	ORDER BY cat,name);
 
+$sql{portdata_selectall_discovered} =
+	q(SELECT *
+	    FROM portdata
+	   WHERE method = 1
+	      OR method = 4
+	ORDER BY cat,name);
+
 $sql{portdata_selectall_limited} =
 	q(SELECT *
 	    FROM portdata
