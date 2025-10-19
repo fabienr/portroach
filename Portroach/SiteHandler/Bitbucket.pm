@@ -1,5 +1,6 @@
 #------------------------------------------------------------------------------
 # Copyright (C) 2015,2020 Jasper Lievisse Adriaanse <jasper@openbsd.org>
+# Copyright (C) 2025 Fabien Romano <fabien@openbsd.org>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +34,7 @@ require 5.006;
 
 push @Portroach::SiteHandler::sitehandlers, __PACKAGE__;
 
+my $bitbucket_re = qr/https?\:\/\/bitbucket\.org/;
 
 #------------------------------------------------------------------------------
 # Func: new()
@@ -70,16 +72,37 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	# The following two URLs will be handled:
-	# http://bitbucket.org/{accountname}/{repo_slug}/get/
-	# https://bitbucket.org/{accountname}/{repo_slug}/downloads/
-	return ($url =~ /https?:\/\/bitbucket\.org\/.*?(get|downloads)\//);
+	return ($url =~ /^$bitbucket_re/);
+}
+
+
+#------------------------------------------------------------------------------
+# Func: GetName()
+# Desc: Return name or undef.
+#
+# Args: $url - A URL we want to extract name from.
+#
+# Retn: undef
+#------------------------------------------------------------------------------
+
+sub GetName
+{
+	my $self = shift;
+
+	my ($url) = @_;
+
+	if ($url =~ /^$bitbucket_re\/([^\/]+)\/([^\/]+)(\/|$)/) {
+		return "$1/$2";
+	} else {
+		return undef;
+	}
 }
 
 
 #------------------------------------------------------------------------------
 # Func: GetFiles()
-# Desc: Extract a list of files from the given URL. Simply query the API.
+# Desc: Extract a list of files from the given URL. Query the bitbucket API
+#       for available downloads of a given module.
 #
 # Args: $url     - URL we would normally fetch from.
 #       \%port   - Port hash fetched from database.
@@ -94,35 +117,38 @@ sub GetFiles
 
 	my ($url, $port, $files) = @_;
 
-	my ($api, $accountname, $repo_slug, $resp, $query, $ua);
+	my ($api, $projname, $account, $repo, $resp, $query, $ua);
 	$api = 'https://api.bitbucket.org/2.0/repositories/';
 
-	if ($url =~ /http(?:s?):\/\/bitbucket\.org\/(.*?)\/(.*?)\/(?:get|downloads)\//) {
-	    $accountname = $1;
-	    $repo_slug = $2;
-	} else {
-	    print STDERR "$port->{fullpkgpath}: $url, "
-	        . "failed to match accountname/repo_slug\n";
-	    return 0;
+	$projname = $self->GetName($url);
+	unless ($projname) {
+		print STDERR "$port->{fullpkgpath}: $url, "
+		    . "no projname found in url\n";
+		return 0;
 	}
+	($account, $repo) = split('/', lc $projname);
 
-	$query = $api . $accountname . '/' . $repo_slug . '/downloads';
+	$query = $api . $account . '/' . $repo . '/downloads';
 
 	debug(__PACKAGE__, $port, "GET $query");
 	$ua = $ua = lwp_useragent();
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
-	    my $downloads = decode_json($resp->decoded_content);
+		my $downloads = decode_json($resp->decoded_content);
 
-	    foreach my $dl ($downloads->{values}[0]) {
-		    push(@$files, $dl->{name});
-	    }
+		foreach my $dl ($downloads->{values}[0]) {
+			push(@$files, $dl->{name});
+		}
 	} else {
-	    info(1, $port->{fullpkgpath}, strchop($query, 60)
-	        . ': ' . $resp->status_line);
-	    return 0;
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+		    . ': ' . $resp->status_line);
 	}
+
+	# Extract versions from git tags
+	$query = "https://bitbucket.org/$projname.git";
+	$url = "https://bitbucket.org/$projname/get/";
+	return 0 if (extractgit($port, $query, $url, $files) < 0);
 
 	return 1;
 }
