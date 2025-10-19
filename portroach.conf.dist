@@ -46,7 +46,8 @@ templates dir =	/usr/local/share/portroach/templates/
 
 # Items in the list may contain * and ? wildcard characters.
 
-restrict maintainer =		# Limit to these maintainers
+restrict site =			# Limit to these sites
+restrict maintainer =		# "     "  "     maintainers
 restrict category =		# "     "  "     categories
 restrict port =			# "     "  "     ports
 

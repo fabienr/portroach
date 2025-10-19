@@ -107,6 +107,18 @@ $sql{ports_select_count} =
     q(SELECT COUNT(fullpkgpath)
         FROM RoachData);
 
+$sql{ports_restrict_site} =
+    q(SELECT fullpkgpath, categories, distname, distfiles,
+             master_sites, maintainer, comment, portroach,
+             portroach_comment, homepage, name
+        FROM RoachData
+       WHERE master_sites like ?);
+
+$sql{ports_restrict_site_count} =
+    q(SELECT COUNT(fullpkgpath)
+        FROM RoachData
+       WHERE master_sites like ?);
+
 $sql{ports_restrict_maintainer} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,

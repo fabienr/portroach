@@ -148,6 +148,7 @@ sub BuildPort
 	my $sths = {};
 	prepare_sql($sdbh, $sths, qw(
 	    ports_select ports_select_count
+	    ports_restrict_site ports_restrict_site_count
 	    ports_restrict_maintainer ports_restrict_maintainer_count
 	    ports_restrict_category ports_restrict_category_count
 	    ports_restrict_port ports_restrict_port_count));
@@ -161,7 +162,18 @@ sub BuildPort
 	# Apply any needed restrictions.
 	my $rc = 0; # report success only if not restricted
 
-	if ($settings{restrict_maintainer}) {
+	if ($settings{restrict_site}) {
+		my $limit = "%$settings{restrict_site}%";
+
+		$sths->{ports_restrict_site}->execute($limit)
+		    or die DBI->errstr;
+		$sths->{ports_restrict_site_count}->execute($limit)
+		    or die DBI->errstr;
+
+		$tot = $sths->{ports_restrict_site_count}->fetchrow_array;
+		$q = $sths->{ports_restrict_site};
+
+	} elsif ($settings{restrict_maintainer}) {
 		my $limit = "$settings{restrict_maintainer}%";
 
 		$sths->{ports_restrict_maintainer}->execute($limit)

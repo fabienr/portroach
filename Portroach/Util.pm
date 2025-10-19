@@ -104,7 +104,8 @@ my %beta_types;
 my %want_regex = (
 	port       => restrict2regex($settings{restrict_port}),
 	category   => restrict2regex($settings{restrict_category}),
-	maintainer => restrict2regex($settings{restrict_maintainer})
+	maintainer => restrict2regex($settings{restrict_maintainer}),
+	site       => restrict2regex('*' . $settings{restrict_site} . '*'),
 );
 
 # XXX vercompare handle long months but not date_regex
@@ -1234,12 +1235,21 @@ sub arrexists
 
 sub wantport
 {
-	my ($path, $category, $maintainer) = @_;
+	my ($path, $category, $maintainer, $sites) = @_;
 
-	my ($needed, $matched);
+	my ($site, $needed, $matched);
 
 	$needed = 0;
 	$matched = 0;
+
+	if ($want_regex{site} && defined $sites) {
+		$needed++;
+
+		$sites =~ $want_regex{site}
+			and $matched++;
+
+		return 0 if ($matched != $needed);
+	}
 
 	if ($want_regex{maintainer} && defined $maintainer) {
 		$needed++;

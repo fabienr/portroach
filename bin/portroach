@@ -309,7 +309,8 @@ sub Check
 	# Reset sitedata counter on full check (with no restriction)
 	if (!$settings{restrict_port} &&
 	    !$settings{restrict_category} &&
-	    !$settings{restrict_maintainer}) {
+	    !$settings{restrict_maintainer} &&
+	    !$settings{restrict_site}) {
 		$sths{sitedata_reset}->execute;
 		info(0, "Doing full check, reset site data.");
 	} else {
