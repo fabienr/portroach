@@ -1635,7 +1635,8 @@ sub prepare_sql
 	foreach (@queries) {
 		if (exists $Portroach::SQL::sql{$_}) {
 			$$sths{$_} = $dbh->prepare($Portroach::SQL::sql{$_})
-				or die DBI->errstr . "; statement \"$_\"";
+			    or die DBI->errstr . "; statement \"$_\""
+			    . "; query $Portroach::SQL::sql{$_}";
 		} else {
 			die "Attempted to prepare non-existent SQL query ($_).\n";
 		}
