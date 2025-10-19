@@ -68,10 +68,10 @@ my $datasrc;
 
 @bad_versions =
 	qw(win32 cygwin linux osx hpux irix hp-ux hp_ux solaris
-	   hp-ux irix mac-?os darwin aix macintosh manual docs?
+	   hp-ux irix mac-?os darwin aix mac macintosh manual docs?
 	   examples sunos tru64 rh\d-rpm suse sun4[a-z]? cvs snap
 	   win jdk i[3-6]86 theme nolib dyn lin(?:ux)?(?:\d\d)?
-	   \.exe$ pkg elf debian html mingw);
+	   \.exe$ pkg elf debian html mingw android gp2x);
 
 
 #------------------------------------------------------------------------------
