@@ -1,5 +1,6 @@
 #------------------------------------------------------------------------------
 # Copyright (C) 2011, Shaun Amott <shaun@inerd.com>
+# Copyright (C) 2025 Fabien Romano <fabien@openbsd.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,7 +30,9 @@ package Portroach::Util;
 
 use Portroach::Const;
 use Portroach::Config;
+
 use File::Path qw(make_path);
+use List::MoreUtils qw(uniq);
 use URI::Escape;
 
 require Exporter;
@@ -55,6 +58,7 @@ our @EXPORT = qw(
 	&isbeta
 	&chopbeta
 	&nametoregex
+	&porttoregex
 	&vertoregex
 	&verguess
 	&vercompare
@@ -368,6 +372,171 @@ sub nametoregex
 	}
 
 	return lc $regex;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: porttoregex()
+# Desc: Transform $port into a regex to matches as a version prefix.
+#
+# Args: $port  - Port hash which contains name, fullpkgpath, homepage
+#       $sites - Array of sites to extract names from their host part
+#
+# Retn: $regex - A regular expression to match another name against
+#------------------------------------------------------------------------------
+
+sub porttoregex
+{
+	my ($port, $sites) = @_;
+	my ($basename, $pathname, $catname, @sites, $basename_q, $pathname_q,
+	    @name_q, $is_build, $is_strict, @cats, $dist_q);
+
+	# Prepare name queries to guess version later on
+	$basename = $port->{name};
+	$basename =~ s/(\-\D[^\-]*)+$//g;
+	$basename =~ s/^(.*)-([^-]*)$/$1/g;
+	$basename_q = nametoregex($basename);
+	$basename_q = quotemeta($basename) unless($basename_q);
+	#debug(__PACKAGE__, $port, "basename regex, "
+	#    . "$basename -> $basename_q");
+	push(@name_q, $basename_q);
+	$pathname = fullpkgpathtoport($port->{fullpkgpath});
+	if ($basename ne $pathname) {
+		$pathname_q = nametoregex($pathname);
+		$pathname_q = quotemeta($pathname) unless($pathname_q);
+		#debug(__PACKAGE__, $port, "pathname regex, "
+		#    . "$pathname -> $pathname_q");
+		push(@name_q, $pathname_q);
+	}
+
+	if (!$sites) {
+		# Use during check, we already have mastersites built
+		@sites = split(' ', $port->{mastersites});
+		push(@sites, $port->{homepage});
+	} elsif (scalar @$sites) {
+		# Use during build, sites isn't empty so we can add homepage
+		$is_build = 1;
+		@sites = @$sites;
+		push(@sites, $port->{homepage});
+	} else {
+		# Use to extract handler during check, we do not want to pollute
+		# the regex with site so we keep the list empty.
+		$is_strict = 1;
+	}
+
+	# Add extra guess based on fullpkgpath
+	@cats = fullpkgpathtosubcat($port->{fullpkgpath}) if (!$is_strict);
+	foreach $catname (@cats) {
+		my $q = nametoregex($catname);
+		#debug(__PACKAGE__,$port,"catname regex, $catname -> $q");
+		push(@name_q, $q);
+		if ($catname =~ /^lib/) {
+			$q = $catname;
+			$q =~ s/^lib//;
+			$q = nametoregex($q);
+			#debug(__PACKAGE__, $port, "(lib)cat regex, "
+			#    . "$catname -> $q");
+			push(@name_q, $q);
+		}
+	}
+
+	# Add extra guesses based on SITES/HOMEPAGE
+	foreach my $site (@sites) {
+		next unless ($site);
+		my $name;
+		#debug(__PACKAGE__, $port, "extract host regex from $site");
+		if ($site =~ m:/([^/]+)\.git/:) {
+			$name = nametoregex($1);
+			#debug(__PACKAGE__, $port, "site .git regex, "
+			#    . "$site -> $name");
+			push(@name_q, $name);
+		}
+		$name = Portroach::SiteHandler->FindName($site);
+		if ($name) {
+			$name = nametoregex($name);
+			#debug(__PACKAGE__, $port, "site handler regex, "
+			#    . "$site -> $name");
+			push(@name_q, $name);
+			next;
+		}
+		try {
+			$name = URI->new($site)->host;
+		} catch {
+			print STDERR "$port->{fullpkgpath}: "
+			    . "caught error on $site\n";
+			debug(__PACKAGE__, $port, "$_");
+			next;
+		};
+		$name =~ s/\.[^\.]+$//;
+		$name =~ s/^[^\.]+\.//;
+		# XXX better way ?
+		next if ($name =~ /(github|python)/);
+		if ($name) {
+			$name = nametoregex($name);
+			#debug(__PACKAGE__, $port, "site host regex, "
+			#    . "$site -> $name");
+			push(@name_q, $name);
+		}
+	}
+
+	# Add extra guess based on basename (pkgname), ONLY during build
+	if ($is_build && $basename =~ /^lib/) {
+		my $q = $basename;
+		$q =~ s/^lib//;
+		$q = nametoregex($q);
+		#debug(__PACKAGE__, $port, "(lib)name regex, $basename -> $q");
+		push(@name_q, $q);
+	}
+	if ($is_build && $basename =~ /^\d{2,}\D/) {
+		my $q = $basename;
+		$q =~ s/^\d{2,}//;
+		$q = nametoregex($q);
+		#debug(__PACKAGE__, $port, "name\$ regex, $basename -> $q");
+		push(@name_q, $q);
+		$q = $basename;
+		$q =~ s/^(\d{2,}).*?$/$1/;
+		$q = nametoregex($q);
+		#debug(__PACKAGE__, $port, "^digit regex, $basename -> $q");
+		push(@name_q, $q);
+	} elsif ($is_build && $basename =~ /\D\d{2,}$/) {
+		my $q = $basename;
+		$q =~ s/\d{2,}$//;
+		$q = nametoregex($q);
+		#debug(__PACKAGE__, $port, "^name regex, $basename -> $q");
+		push(@name_q, $q);
+		$q = $basename;
+		$q =~ s/^.*?(\d{2,})$/$1/;
+		$q = nametoregex($q);
+		#debug(__PACKAGE__, $port, "digit\$ regex, $basename -> $q");
+		push(@name_q, $q);
+	} elsif ($is_build && $basename =~ /\D\d$/) {
+		my $q = $basename;
+		$q =~ s/\d$//;
+		$q = nametoregex($q);
+		#debug(__PACKAGE__, $port, "^name regex, $basename -> $q");
+		push(@name_q, $q);
+	}
+
+	# Finally compute the regex
+	foreach my $q (@name_q) {
+		next unless ($q =~ /\|/);
+		my @qs = split (/\|/, $q);
+		for my $i (0 .. $#qs) {
+			next unless ($qs[$i]);
+			push(@name_q, $qs[$i]);
+			#debug(__PACKAGE__, $port, "split $q -> $qs[$i]");
+		}
+	}
+	@name_q = sort { length $b <=> length $a } uniq @name_q;
+	foreach my $q (@name_q) {
+		#debug(__PACKAGE__, $port, "skip $q") if ($q =~ /\|/);
+		next if ($q =~ /\|/); # already splited, skip duplicate re
+		next unless ($q);
+		$dist_q .= '|' if ($dist_q);
+		$dist_q .= $q;
+	}
+	#debug(__PACKAGE__, $port, "porttoregex $port->{name} -> $dist_q");
+	return $dist_q;
 }
 
 

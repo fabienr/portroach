@@ -140,109 +140,6 @@ sub BuildDB
 	return 1;
 }
 
-sub BuildPortRegex
-{
-	my ($port, $sites) = @_;
-	my ($basename, $pathname, $catname, $basename_q, $pathname_q, @name_q,
-	    $dist_q);
-
-	# Prepare name queries to guess version later on
-	$basename = $port->{fullpkgname};
-	$basename =~ s/(\-\D[^\-]*)+$//g;
-	$basename =~ s/^(.*)-([^-]*)$/$1/g;
-	$pathname = fullpkgpathtoport($port->{fullpkgpath});
-	$catname = fullpkgpathtosubcat($port->{fullpkgpath});
-	$basename_q = nametoregex($basename);
-	debug(__PACKAGE__, $port, "basename regex, "
-	    . "$basename -> $basename_q");
-	push(@name_q, $basename_q);
-	if ($basename ne $pathname) {
-		$pathname_q = nametoregex($pathname);
-		debug(__PACKAGE__, $port, "pathname regex, "
-		    . "$pathname -> $pathname_q");
-		push(@name_q, $pathname_q);
-	}
-
-	# Add extra guess based on fullpkgpath
-	if ($catname) {
-		my $q = nametoregex($catname);
-		debug(__PACKAGE__,$port,"catname regex, $catname -> $q");
-		push(@name_q, $q);
-		if ($catname =~ /^lib/) {
-			$q = $catname;
-			$q =~ s/^lib//;
-			$q = nametoregex($q);
-			debug(__PACKAGE__, $port, "(lib)cat regex, "
-			    . "$catname -> $q");
-			push(@name_q, $q);
-		}
-	}
-
-	# Add extra guesses based on SITES/HOMEPAGE
-	foreach my $site (@$sites, $port->{homepage}) {
-		if ($site =~ m:/([^/]+)\.git/:) {
-			push(@name_q, nametoregex($1));
-		}
-		my $name = Portroach::SiteHandler->FindName($site);
-		next unless ($name);
-		$name = nametoregex($name);
-		push(@name_q, $name);
-	}
-
-	# Add extra common pattern guess based basename (pkgname)
-	if ($basename =~ /^lib/) {
-		my $q = $basename;
-		$q =~ s/^lib//;
-		$q = nametoregex($q);
-		debug(__PACKAGE__, $port, "(lib)name regex, $basename -> $q");
-		push(@name_q, $q);
-	}
-	if ($basename =~ /^\d{2,}\D/) {
-		my $q = $basename;
-		$q =~ s/^\d{2,}//;
-		$q = nametoregex($q);
-		debug(__PACKAGE__, $port, "name\$ regex, $basename -> $q");
-		push(@name_q, $q);
-		$q = $basename;
-		$q =~ s/^(\d{2,}).*?$/$1/;
-		$q = nametoregex($q);
-		debug(__PACKAGE__, $port, "^digit regex, $basename -> $q");
-		push(@name_q, $q);
-	} elsif ($basename =~ /\D\d{2,}$/) {
-		my $q = $basename;
-		$q =~ s/\d{2,}$//;
-		$q = nametoregex($q);
-		debug(__PACKAGE__, $port, "^name regex, $basename -> $q");
-		push(@name_q, $q);
-		$q = $basename;
-		$q =~ s/^.*?(\d{2,})$/$1/;
-		$q = nametoregex($q);
-		debug(__PACKAGE__, $port, "digit\$ regex, $basename -> $q");
-		push(@name_q, $q);
-	} elsif ($basename =~ /\D\d$/) {
-		my $q = $basename;
-		$q =~ s/\d$//;
-		$q = nametoregex($q);
-		debug(__PACKAGE__, $port, "^name regex, $basename -> $q");
-		push(@name_q, $q);
-	}
-
-	# Finally compute the regex
-	foreach my $q (@name_q) {
-		next unless ($q =~ /\|/);
-		my @qs = split (/\|/, $q);
-		for my $i (1 .. $#qs) {
-			push(@name_q, $qs[$i]);
-		}
-	}
-	@name_q = sort { length $b <=> length $a } uniq @name_q;
-	foreach my $q (@name_q) {
-		$dist_q .= '|' if ($dist_q);
-		$dist_q .= $q;
-	}
-	return $dist_q;
-}
-
 # Queries SQLports for:
 sub BuildPort
 {
@@ -507,8 +404,10 @@ sub BuildPort
 		$pkgver = vertoregex($pkgver);# lazy version separator X.Y ~ XY
 		debug(__PACKAGE__, $port, "pkgver, $pkgver");
 
-		# Compute regex to extract version (as a fallback)
-		$dist_q = BuildPortRegex($port,\@sites);
+		# Compute regex to extract version
+		# no $port->{mastersites} at this stage, provide \@sites
+		# XXX may be replace by extractversion() otherwise
+		$dist_q = porttoregex($port, \@sites); 
 		debug(__PACKAGE__, $port, "regex, $dist_q");
 
 		# Stop on the first version match, keep track of source string
