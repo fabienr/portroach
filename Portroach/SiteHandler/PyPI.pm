@@ -1,5 +1,6 @@
 #------------------------------------------------------------------------------
 # Copyright (C) 2015, Jasper Lievisse Adriaanse <jasper@openbsd.org>
+# Copyright (C) 2025 Fabien Romano <fabien@openbsd.org>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -25,7 +26,6 @@ use Portroach::Util;
 use strict;
 
 require 5.006;
-
 
 #------------------------------------------------------------------------------
 # Globals
@@ -115,7 +115,7 @@ sub GetFiles
 		my @releases = ( keys %{$json->{releases}} );
 		foreach my $version (@releases) {
 			foreach my $file (@{$json->{releases}{$version}}) {
-				push(@$files, $file->{url});
+				push(@$files, $file->{filename});
 			}
 		}
 	} else {
