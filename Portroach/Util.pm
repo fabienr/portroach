@@ -174,7 +174,7 @@ $verlike_regex = qr/
     |$date_regex
     |\d{2,}([a-z]{,2}\d{,2})?/x;
 
-$lang_regex = qr/(?:hs|lua|mod|node|p5|perl|py\d?|ruby)/;
+$lang_regex = qr/(?:cpp|hs|lua|mod|node|p5|perl|py\d?|ruby)/;
 
 #------------------------------------------------------------------------------
 # Func: strchop()
