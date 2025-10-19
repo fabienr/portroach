@@ -50,10 +50,6 @@ use Portroach::Const;
 use Portroach::Util;
 use Portroach::Config;
 
-use Portroach::SiteHandler::FTP;
-use Portroach::SiteHandler::HTTP;
-use Portroach::SiteHandler::HttpGuess;
-
 use feature qw(switch);
 no if $] >= 5.018, warnings => "experimental::smartmatch";
 
