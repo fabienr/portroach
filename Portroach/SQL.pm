@@ -368,6 +368,15 @@ $sql{portdata_findnewnew} =
 	            OR mailed is NULL )
 	ORDER BY cat,name ASC);
 
+$sql{portdata_allnewnew} =
+	q(SELECT *
+	    FROM portdata
+	   WHERE newver != ver
+	     AND newver is not NULL
+	     AND (( mailed != ver AND mailed != newver )
+	            OR mailed is NULL )
+	ORDER BY cat,name ASC);
+
 $sql{portdata_setmailed} =
 	q(UPDATE portdata
 	     SET mailed = ?

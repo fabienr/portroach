@@ -1846,13 +1846,16 @@ sub MailMaintainers
 		return 1;
 	}
 
-	print "Mailing maintainers of out-of-date ports...\n";
-
 	$dbh = connect_db();
 
-	prepare_sql($dbh, \%sths,
-		qw(maildata_select portdata_findnewnew portdata_setmailed)
+	prepare_sql($dbh, \%sths, qw(
+	    maildata_select
+	    portdata_findnewnew
+	    portdata_allnewnew
+	    portdata_setmailed)
 	);
+
+	print "Mailing maintainers of out-of-date ports...\n";
 
 	$sths{maildata_select}->execute;
 
@@ -1863,9 +1866,9 @@ sub MailMaintainers
 		my $msg;
 		my $ports = 0;
 		$sths{portdata_findnewnew}->execute("%<${addr}>%");
-		$template->applyglobal({maintainer => lc $addr});
 
-		while (my $port = $sths{portdata_findnewnew}->fetchrow_hashref) {
+		$template->applyglobal({maintainer => lc $addr});
+		while (my $port = $sths{portdata_findnewnew}->fetchrow_hashref){
 			$template->pushrow($port);
 			$ports++;
 		}
@@ -1878,12 +1881,61 @@ sub MailMaintainers
 		info(0, $addr, "$ports new port(s) out of date");
 
 		$msg = MIME::Lite->new(
-			From     => $settings{mail_from} =~ /@/
-			                ? $settings{mail_from}
-			                : $settings{mail_from}.'@'.hostname(),
-			To       => $addr,
-			Subject  => $settings{mail_subject},
-			Data     => $template->string
+			From	=> $settings{mail_from} =~ /@/
+			    ? $settings{mail_from}
+			    : $settings{mail_from}.'@'.hostname(),
+			To	=> $addr,
+			Subject	=> $settings{mail_subject},
+			Data	=> $template->string
+		);
+
+		$msg->replace('X-Mailer' => USER_AGENT);
+
+		$msg->send;
+
+		$template->reset;
+
+		# Second pass to mark port newvers as mailed
+
+		if (!$settings{precious_data} && !$settings{mail_list}) {
+			$sths{portdata_findnewnew}->finish;
+			$sths{portdata_findnewnew}->execute("%<${addr}>%");
+
+			while (my $port =
+			    $sths{portdata_findnewnew}->fetchrow_hashref) {
+				$sths{portdata_setmailed}->execute(
+				    $port->{newver}, $port->{fullpkgpath});
+			}
+		}
+	}
+
+	print "Mailing list of out-of-date ports...\n";
+
+	if ($settings{mail_list}) {
+		my $msg;
+		my $ports = 0;
+		$sths{portdata_allnewnew}->execute();
+
+		$template->applyglobal({maintainer => 'any'});
+		while (my $port = $sths{portdata_allnewnew}->fetchrow_hashref){
+			$template->pushrow($port);
+			$ports++;
+		}
+
+		if ($ports == 0) {
+			$template->reset;
+			next;
+		}
+
+		info(0, "list", "$ports new port(s) out of date");
+
+		$msg = MIME::Lite->new(
+			From	=> $settings{mail_from} =~ /@/
+			    ? $settings{mail_from}
+			    : $settings{mail_from}.'@'.hostname(),
+			To	=> $settings{mail_list},
+			Subject	=> $settings{mail_subject},
+			Data	=> $template->string
 		);
 
 		$msg->replace('X-Mailer' => USER_AGENT);
@@ -1895,10 +1947,11 @@ sub MailMaintainers
 		# Second pass to mark port newvers as mailed
 
 		if (!$settings{precious_data}) {
-			$sths{portdata_findnewnew}->finish;
-			$sths{portdata_findnewnew}->execute("%<${addr}>%");
+			$sths{portdata_allnewnew}->finish;
+			$sths{portdata_allnewnew}->execute();
 
-			while (my $port = $sths{portdata_findnewnew}->fetchrow_hashref) {
+			while (my $port =
+			    $sths{portdata_allnewnew}->fetchrow_hashref) {
 				$sths{portdata_setmailed}->execute(
 				    $port->{newver}, $port->{fullpkgpath});
 			}

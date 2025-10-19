@@ -65,6 +65,9 @@ mail subject =	OpenBSD ports you maintain which are out of date
 mail method =	sendmail  	# Can be 'sendmail' or 'smtp'
 #mail host =	localhost	# SMTP server, if method is 'smtp'
 
+# Uncomment to send a summary of daily changes.
+#mail list =	portroach@openbsd.org
+
 #-- Output Settings -----------------------------------------------------------
 
 # Timezone options. This is just eye-candy for template generation, but setting

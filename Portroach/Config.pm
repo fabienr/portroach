@@ -105,6 +105,7 @@ my (@paths, %settings_types, $bool_opts);
 	mail_subject		=> '',
 	mail_method		=> 'sendmail',
 	mail_host		=> 'localhost',
+	mail_list		=> '',
 
 	user			=> '',
 	group			=> '',
