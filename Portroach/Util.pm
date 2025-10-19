@@ -33,7 +33,14 @@ use Portroach::Config;
 
 use File::Path qw(make_path);
 use List::MoreUtils qw(uniq);
+use List::Util qw(first);
+
+use URI;
 use URI::Escape;
+use HTML::Entities;
+
+use Try::Tiny;
+use Capture::Tiny 'capture';
 
 require Exporter;
 
@@ -65,6 +72,8 @@ our @EXPORT = qw(
 	&betacompare
 	&checkevenodd
 	&extractfilenames
+	&extractpages
+	&extracthandlers
 	&extractdirectories
 	&extractsubdirectories
 	&extractsuffix
@@ -969,24 +978,56 @@ sub extractfilenames
 
 
 #------------------------------------------------------------------------------
-# Func: extractdirectories()
-# Desc: Extract directories matching a version schema
+# Func: extractpages()
+# Desc: Extract plausible download pages from an homepage
 #
-# Args: $data    - Data from master site request.
-#       \$dirs   - Where to put directories found.
+# Args: $resp    - Response from site request.
+#       \$pages  - Where to put pages found.
 #
 # Retn: $success - true/false
 #------------------------------------------------------------------------------
 
-sub extractdirectories
+sub extractpages
 {
-	my ($data, $dirs) = @_;
+	my ($resp, $pages) = @_;
+	my ($page_re, $ext_re, $base, $html, $link, $sh, $page);
 
-	foreach (split "<", $data) {
-		next unless (/^a\s+href\s*=\s*('|")(.*?)\1/i);
-		my $link = $2;
-		next unless $link =~ /$verlike_regex/i;
-		push @$dirs, $link;
+	$page_re = qr/(?<!\#)[^\#]*(developers|down|community|contributing|
+		software|source)/x;
+	$ext_re = qr/(\/|\.html|\.php|(^|\/)[^\.]*)/;
+	$base = $resp->base;
+	$base =~ s/[^\/]+$//;
+
+	foreach $html (split "<", $resp->content) {
+		next unless ($html =~ /^a\s.*(?<=\s)href\s*=\s*('|")(.*?)\1/i);
+		#debug(__PACKAGE__, undef, "page ? $html");
+		$link = $2;
+		# debug(__PACKAGE__, undef, "$link !~ /$page_re/i")
+		#     unless ($link =~ /$page_re/i);
+		next unless ($link =~ /$page_re/i);
+		# debug(__PACKAGE__, undef, "$link !~ /$ext_re\$/i")
+		#     unless ($link =~ /$ext_re$/i);
+		next unless ($link =~ /$ext_re$/i);
+		$sh = Portroach::SiteHandler->FindHandler($link);
+		debug(__PACKAGE__, undef, "skip page handler $link") if ($sh);
+		next if ($sh);
+		if ($link !~ /^(.*?:\/\/|\/)/) {
+			#debug(__PACKAGE__, undef, "$link => ".$base.".$link");
+			$link = $base.$link;
+		}
+		$page = path_absolute($link);
+		#debug(__PACKAGE__, undef, "absolute $link -> $page")
+		#    if ($page ne $link);
+		$link = $page;
+		$page = uri_unescape($link);
+		#debug(__PACKAGE__, undef, "unescape $link -> $page")
+		#    if ($page ne $link);
+		if ( first { $page eq $_ } @$pages) {
+			debug(__PACKAGE__,undef,"already record, skip $page");
+			next;
+		}
+		#debug(__PACKAGE__, undef, "push page $page");
+		push @$pages, $page;
 	}
 
 	return 1;
@@ -994,7 +1035,54 @@ sub extractdirectories
 
 
 #------------------------------------------------------------------------------
-# Func: extractsubdirectories()
+# Func: extracthandlers()
+# Desc: Extract site handler from a webpage
+#
+# Args: $data      - Data from master site request.
+#       $port      - Port hash which contains name to filter unrelated handlers.
+#       \$handlers - Where to put handlers found.
+#
+# Retn: $success   - true/false
+#------------------------------------------------------------------------------
+
+sub extracthandlers
+{
+	my ($data, $port, $handlers) = @_;
+	my ($name_q, $html, $link, $sh, $name);
+
+	$name_q = porttoregex($port, []); # XXX strict minimum
+
+	debug(__PACKAGE__, undef, "extract handlers =~ $name_q");
+	foreach $html (split "<", $data) {
+		next unless ($html =~ /^a\s.*(?<=\s)href\s*=\s*('|")(.*?)\1/i);
+		#debug(__PACKAGE__, undef, "handler ? $html");
+		$link = $2;
+		$link = 'https:'.$link if ($link =~ m:^//:);
+		$sh = Portroach::SiteHandler->FindHandler($link);
+		#debug(__PACKAGE__, undef, "!SiteHandler->FindHandler($link)")
+		#    unless ($sh);
+		next unless ($sh);
+		$name = $sh->GetName($link);
+		#debug(__PACKAGE__, undef, "!sh->GetName($link)")
+		#    unless ($name);
+		next unless ($name);
+		debug(__PACKAGE__, undef, "$link !~ /$name_q/i")
+		    unless ($link =~ /$name_q/i);
+		next unless ($link =~ /$name_q/i);
+		debug(__PACKAGE__, undef, "$link name $name !~ /$name_q/i")
+		    unless ($name =~ /(^|\/)($name_q)(\/|$)/i);
+		next unless ($name =~ /(^|\/)($name_q)(\/|$)/i);
+		$sh->{site} = $link;
+		debug(__PACKAGE__,undef,"push handler $sh->{name} for $link");
+		push @$handlers, $sh;
+	}
+
+	return 1;
+}
+
+
+#------------------------------------------------------------------------------
+# Func: extractdirectories()
 # Desc: Extract directories from a mastersite index, going down the path only.
 #
 # Args: $resp    - Response from master site request.
