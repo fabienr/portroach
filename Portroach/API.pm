@@ -270,14 +270,14 @@ sub AddPort
 		if (($1.$2) =~ /(?:$settings{build_nolimit})$/i) {
 			debug(__PACKAGE__, $port, "$prefix.$limit: no limit");
 			undef $limit;
-		} elsif ($port->{ver} !~ "^$limit") {
+		} elsif ($port->{ver} !~ /^$limit(\.|\-|\_|$)/) {
 			debug(__PACKAGE__, $port,
 			    "$prefix.$limit: ver $limit !~ port $port->{ver}");
 			undef $limit;
 		}
 		if ($limit) {
 			debug(__PACKAGE__, $port, "static limitver: ^$limit");
-			$pcfg{limitver} = "^$limit(\\.|\$)";
+			$pcfg{limitver} = "^$limit(\\.|\\-|\\_|\$)";
 			$pcfg{pcfg_static} = 1;
 			last;
 		}
@@ -315,11 +315,12 @@ sub AddPort
 				    . "bad portconfig regex ($val)\n";
 				next;
 			};
-			# Clean and compare generate limitver with port config
+			# Clean and compare generated limitver with port config
 			my $port_limit = $pcfg{limitver};
 			my $conf_limit = $val;
-			$port_limit =~ s/[\\\.\|\(\)\$]//g;
-			$conf_limit =~ s/[\\\.]//g;
+			# Drop any kind of delimiter regex to compare strings
+			$port_limit =~ s/[\\\.\|\(\)\$\-\_]//g;
+			$conf_limit =~ s/[\\\.\|\(\)\$\-\_]//g;
 			if ($port_limit eq $conf_limit) {
 				info(0, $port->{fullpkgpath},
 				    "unneeded limitver $val ~ $pcfg{limitver}");
@@ -327,8 +328,8 @@ sub AddPort
 				info(0, $port->{fullpkgpath},
 				    "use limitver $val != $pcfg{limitver}");
 				$pcfg{pcfg_static} = 0;
+				$pcfg{limitver} = $val;
 			}
-			$pcfg{limitver} = $val;
 			next;
 		}
 
@@ -382,6 +383,21 @@ sub AddPort
 	$pcfg{skipbeta} = 1 if !exists($pcfg{skipbeta});
 	$pcfg{ignore} = 0 if !exists($pcfg{ignore});
 	$pcfg{pcfg_static} = 0 if !exists($pcfg{pcfg_static});
+
+	if ($pcfg{limitver} && $port->{ver} !~ /$pcfg{limitver}/) {
+		info(0, $port->{fullpkgpath},
+		    "broken limitver $port->{ver} ~ $pcfg{limitver}");
+		$pcfg{limitver} = undef;
+	}
+
+	if (defined $pcfg{limiteven} && $pcfg{limitwhich} >= 0 &&
+	    !checkevenodd($port->{ver}, $pcfg{limiteven}, $pcfg{limitwhich})) {
+		info(0, $port->{fullpkgpath},
+		    "broken limiteven/which $port->{ver} ~"
+		    . " $pcfg{limiteven}/$pcfg{limitwhich}");
+		$pcfg{limiteven} = undef;
+		$pcfg{limitwhich} = undef;
+	}
 
 	$sths->{portconfig_update}->execute(
 		$pcfg{indexsite}, $pcfg{limitver}, $pcfg{limiteven},
