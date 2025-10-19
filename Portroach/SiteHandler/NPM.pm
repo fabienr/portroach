@@ -108,7 +108,7 @@ sub GetFiles
 	if ($resp->is_success) {
 	    my ($json, $version);
 
-    	    $json = decode_json($resp->decoded_content);
+	    $json = decode_json($resp->decoded_content);
 	    $version = $json->{version};
 	    unless ($version) {
 	        print STDERR "$port->{fullpkgpath}: $query, "
