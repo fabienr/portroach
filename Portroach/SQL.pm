@@ -189,12 +189,16 @@ $sql{portdata_select} =
 	                        WHERE host = ?
 	                        LIMIT 1)
 	           OR systemid is NULL )
-	     AND ignore != true
 	ORDER BY fullpkgpath);
 
 $sql{portdata_count} = $sql{portdata_select};
 $sql{portdata_count} =~ s/^SELECT \*/SELECT COUNT(*)/i;
 $sql{portdata_count} =~ s/ORDER BY.*$/LIMIT 1/i;
+
+$sql{portdata_resetchecked} =
+	q(UPDATE portdata
+	     SET checked = NULL, newver = NULL, newurl = NULL,  method = NULL
+	   WHERE id = ?);
 
 $sql{portdata_setchecked} =
 	q(UPDATE portdata

@@ -319,11 +319,14 @@ sub Check
 
 	if ($nofork) {
 		prepare_sql($dbh, \%sths, qw(
+			portdata_resetchecked
 			portdata_setchecked
 			portdata_setnewver
 			portdata_fixnewver
 			portdata_resetnewver
 			portdata_setmethod
+			sitedata_exists
+			sitedata_insert
 			sitedata_select
 			sitedata_failure
 			sitedata_success
@@ -341,7 +344,7 @@ sub Check
 		$i++;
 
 		$want = wantport($port->{fullpkgpath}, $port->{cat},
-		    $port->{maintainer});
+		    $port->{maintainer}, $port->{mastersites});
 
 		if ($nofork) {
 			# This is all we need if we're not forking.
@@ -376,11 +379,14 @@ sub Check
 				$dbh = connect_db(1);
 
 				prepare_sql($dbh, \%sths, qw(
+					portdata_resetchecked
 					portdata_setchecked
 					portdata_setnewver
 					portdata_fixnewver
 					portdata_resetnewver
 					portdata_setmethod
+					sitedata_exists
+					sitedata_insert
 					sitedata_select
 					sitedata_failure
 					sitedata_success
@@ -470,37 +476,126 @@ sub VersionCheck
 {
 	my ($dbh, $sths, $port) = @_;
 
-	my (@sites, @handlers, $found, $k, $i);
+	my (@sites, @checked, @homepages, $site, $new_found, $old_found);
 
-	$found = 0;
-	$k = $port->{fullpkgpath};
-	$i = 0;
+	my $k = $port->{fullpkgpath};
+	my $i = 0;
 
-	# XXX s/distfiles/distfile/
-	return if (!$port->{distfiles} || !$port->{mastersites});
+	# Skip checking on PORTROACH = skipv:*
+	my $skip = 0;
+	foreach (split (/\s+/, $port->{skipversions})) {
+		next unless ("*" eq $_);
+		$skip = 1;
+		debug(__PACKAGE__, $port, "skip any version, no check");
+		last;
+	}
+	if ($skip) {
+		# XXX special ports considered as not found by maintener.
+		# XXX note, ignore feature was doing the same but it was changed
+		# XXX to ignore mail reports instead of ignoring ports checking.
+		# XXX the skiv:* feature is a last resort solution to keep our
+		# XXX dumb portroach crawler/guess/whatever AI working without
+		# XXX generating false report about new version.
+		# XXX NOTE, it would be better to handle repo url directly from
+		# XXX ports Makefile (perhaps as indexsite) or fix each ports.
+		# XXX either drop the homepage feature or use it with caution as
+		# XXX a hint for portroach maintener to help porters.
+		$sths->{portdata_resetchecked}->execute($port->{id})
+		    unless ($settings{precious_data});
+		info(1, $k, 'Skip');
+		return;
+	}
 
 	info(1, $k, 'VersionCheck()');
 
-	# Prepare sites to inspect: indexsite, homepage(*), mastersites
-	# (*) inspect homepage only if handled by a SiteHandler
+	# Prepare sites to inspect: indexsite, homepage(*), mastersites, (*)
+	# (*) inspect homepage before only if handled by a SiteHandler
+	# note, if indexsite exists it disable any http/s guess
 	@sites = split(' ', $port->{mastersites});
 	if (Portroach::SiteHandler->FindHandler($port->{homepage})) {
+		debug(__PACKAGE__, $port, "unshift handler $port->{homepage}");
 		unshift @sites, $port->{homepage};
+	} elsif ($port->{homepage}) {
+		debug(__PACKAGE__, $port, "push homepage $port->{homepage}");
+		push @homepages, $port->{homepage};
 	}
 	if ($port->{indexsite}) {
 		info(1, $k,"indexsite, $port->{indexsite} before mastersite");
 		unshift @sites, $port->{indexsite};
 	}
 
+	# Nothing to look after, goto regression check immediatly
+	# note, without distfile the port doesn't exists in database
+	# portroach isn't a list of available ports
+	goto VERSIONCHECK_REGRESS if (@sites == 0 and @homepages == 0);
+
 	# Loop through master sites
-	foreach my $site (@sites)
+	while (1)
 	{
-		my (@files, @dates, $host, $sitedata, $method, $path_ver, $sh,
-		    $new_found, $old_found, $file);
+		my ($is_homepage, @files, @dates, $host, $sitedata, $method,
+		    $path_ver, $sh);
+		last if (@sites == 0 and @homepages == 0);
+		# XXX keep going until old version is found ?
+		if ($i >= $settings{mastersite_limit} and $old_found) {
+			my $sites = join(", ", @sites);
+			$sites .= ', ' if (@sites and @homepages);
+			$sites .= join(", ", @homepages);
+			my $checked = join(", ", @checked);
+			if ($new_found) {
+				info(1, $k, "Stop processing after $i sites," .
+				    " limit $settings{mastersite_limit}");
+			} elsif ($old_found) {
+				info(1, $k, "Stop processing after $i sites," .
+				    " limit $settings{mastersite_limit}," .
+				    " skip $sites");
+			} else {
+				info(0, $k, "Stop processing after $i sites," .
+				    " limit $settings{mastersite_limit}," .
+				    " skip $sites, tried $checked");
+			}
+			last;
+		}
 
-		$site .= '/' unless $site =~ /\/$/;
+		if ($site = shift(@sites)) {
+			debug(__PACKAGE__, $port, "shift site $site");
+			$is_homepage = 0;
+		} elsif ($site = shift(@homepages)) {
+			debug(__PACKAGE__, $port, "shift homepage $site");
+			$is_homepage = 1;
+		}
 
-		$host = URI->new($site)->host;
+		# check for duplicate site also listed as homepage
+		if (!$is_homepage && first { $site eq $_ } @homepages) {
+			$is_homepage = 1;
+		}
+
+		# XXX unwanted for homepages, maybe check for .html or similar
+		# XXX regressions to check ?
+		# $site .= '/' unless $site =~ /\/$/;
+
+		$site = URI->new($site);
+		if ($site->scheme eq 'git') {
+			$host = lc $site;
+			if ($host =~ m|^(?:git)://([^:/]+)|) {
+				my $host = $1;
+			} else {
+				print STDERR "$port->{fullpkgpath}: "
+				    . "cannot extract host from $site.\n";
+				continue;
+			}
+		} else {
+			# XXX check for failure
+			$host = lc $site->host;
+		}
+
+		$sths->{sitedata_exists}->execute($host);
+		my ($exists) = $sths->{sitedata_exists}->fetchrow_array;
+		if (!$exists && !$settings{precious_data}) {
+			$sths->{sitedata_insert}->execute($site->scheme, $host)
+			    or die "$port->{fullpkgpath}: Failed to add"
+			    . " new site: $DBI::errstr";
+		}
+
 		$sths->{sitedata_select}->execute($host);
 		while (my $data = $sths->{sitedata_select}->fetchrow_hashref) {
 			print STDERR "$port->{fullpkgpath}: multiple sitedata "
@@ -517,50 +612,57 @@ sub VersionCheck
 		}
 
 		$method = 0;
-		$old_found = 0;
-		$new_found = 0;
 
 		$site = URI->new($site)->canonical;
 
-		last if ($i >= $settings{mastersite_limit});
+		# Dedup @sites while processing
+		if ( first { $site eq $_ } @checked ) {
+			info(1, $k, "Already checked site, skip $site");
+			next;
+		}
+
+		push(@checked, $site);
+
+		# Dedup handlers while processing
+		$sh = Portroach::SiteHandler->FindHandler($site);
+		if ($sh && first { $sh->{name} eq $_ } @checked) {
+			info(1, $k, "Already checked site handler "
+			    . "$sh->{name}, skip $site");
+			next;
+		}
+		push(@checked, $sh->{name}) if ($sh);
 
 		$i++;
-
 		info(1, $k, 'Checking site: ' . strchop($site, 60));
 
 		# Look to see if the URL contains the distfile version.
 		# This will affect our checks and guesses later on.
-		if ($site =~ m:^.*/($verprfx_regex)?($verlike_regex)/.*$:) {
-			my $dir_ver = $2;
+		if (my $dir_ver = extractversion($port, lc $site)) {
 			my $dir_ver_q = vertoregex($dir_ver);
-			debug(__PACKAGE__, $port, "port_ver $port->{ver}, "
-			    . "dir_ver $dir_ver, regex $dir_ver_q");
 			if ($dir_ver eq $port->{ver}) {
 				$path_ver = $dir_ver;
 			} elsif ($port->{ver} =~ /^$dir_ver_q/) {
 				$path_ver = $dir_ver;
 			}
+			debug(__PACKAGE__, $port, "port_ver $port->{ver}, "
+			    . "dir_ver $dir_ver, regex $dir_ver_q, "
+			    . "path_ver $path_ver");
 		}
 		debug(__PACKAGE__, $port, "path version $path_ver")
 		    if ($path_ver);
 
 		# Check for special handler for this site first
-		if ($sh = Portroach::SiteHandler->FindHandler($site)) {
-			if ( first { $sh->{name} eq $_ } @handlers) {
-				info(1, $k, "Already tried site handler "
-				    . "$sh->{name}, skip $site");
-				next;
-			}
-			push(@handlers, $sh->{name});
+		if ($sh) {
 			info(1, $k, $host, "Using site handler $sh->{name}.");
 
-			if (!$sh->GetFiles($site, $port, \@files)) {
+			if (!$sh->GetFiles($site, $port, \@files,
+			    \@sites, \@homepages)) {
 				info(1, $k, $host, "$sh->{name} GetFiles() "
 				    . "failed for $site");
-				$sths->{sitedata_failure}->execute($site->host);
+				$sths->{sitedata_failure}->execute($host);
 				next;
 			} else {
-				$sths->{sitedata_success}->execute($site->host);
+				$sths->{sitedata_success}->execute($host);
 				$method = METHOD_HANDLER if (@files);
 			}
 
@@ -570,15 +672,40 @@ sub VersionCheck
 			if (!$sh->GetFiles($site, $port, \@files, $path_ver)) {
 				info(1, $k, $host, "$sh->{name} GetFiles() "
 				    . "failed for $site");
-				$sths->{sitedata_failure}->execute($site->host);
+				$sths->{sitedata_failure}->execute($host);
 				next;
 			} else {
-				$sths->{sitedata_success}->execute($site->host);
+				$sths->{sitedata_success}->execute($host);
 				$method = METHOD_LIST if (@files);
 			}
 
+		# Get files list from Homepage
+		} elsif ($is_homepage) {
+			unless (robotsallowed($dbh, $site, $sitedata)) {
+				info(1, $k, $host, 'Ignoring site as per '
+				    . 'rules in robots.txt.');
+
+				# Don't count 'robots' bans as a failure.
+				# (We fetch them from the database so that
+				# they can be re-checked every so often.)
+				$i--;
+
+				next;
+			}
+
+			$sh = Portroach::SiteHandler::HttpHomepage->new;
+			if (!$sh->GetFiles($site, $port, \@files, \@checked)) {
+				info(1, $k, $host, "$sh->{name} GetFiles() "
+				    . "failed for $site");
+				$sths->{sitedata_failure}->execute($host);
+				next;
+			} else {
+				$sths->{sitedata_success}->execute($host);
+				$method = METHOD_HOMEPAGE if (@files);
+			}
+
 		# Get files list from HTTP
-		} else {
+		} elsif ($site->scheme =~ /https?/) {
 			unless (robotsallowed($dbh, $site, $sitedata)) {
 				info(1, $k, $host, 'Ignoring site as per '
 				    . 'rules in robots.txt.');
@@ -595,12 +722,15 @@ sub VersionCheck
 			if (!$sh->GetFiles($site, $port, \@files, $path_ver)) {
 				info(1, $k, $host, "$sh->{name} GetFiles() "
 				    . "failed for $site");
-				$sths->{sitedata_failure}->execute($site->host);
+				$sths->{sitedata_failure}->execute($host);
 				# not next; give a chance to HttpGuess
 			} else {
-				$sths->{sitedata_success}->execute($site->host);
+				$sths->{sitedata_success}->execute($host);
 				$method = METHOD_LIST if (@files);
 			}
+		} else {
+			print STDERR "$port->{fullpkgpath}: "
+			    . "unknow sheme from $site.\n";
 		}
 
 		# No files found - try some guesses ... over http/s only
@@ -615,7 +745,7 @@ sub VersionCheck
 			if (!$resp->is_success || $resp->status_line !~ /^2/) {
 				info(1, $k, $host,
 				    'Not doing any guess, distfile not found.');
-				$sths->{sitedata_failure}->execute($site->host);
+				$sths->{sitedata_failure}->execute($host);
 				next;
 			}
 
@@ -646,14 +776,13 @@ sub VersionCheck
 
 			# Now we are ready to guess ...
 			$sh = Portroach::SiteHandler::HttpGuess->new;
-			my $ver = $port->{ver}; # XXX search new version again
-			if (!$sh->GetFiles($site,$port,\@files,$path_ver,$ver)) {
+			if (!$sh->GetFiles($site,$port,\@files,$path_ver)) {
 				info(1, $k, $host, "$sh->{name} GetFiles() "
 				    . "failed for $site");
-				$sths->{sitedata_failure}->execute($site->host);
+				$sths->{sitedata_failure}->execute($host);
 				next;
 			} else {
-				$sths->{sitedata_success}->execute($site->host);
+				$sths->{sitedata_success}->execute($host);
 				$method = METHOD_GUESS if (@files);
 			}
 		}
@@ -664,82 +793,105 @@ sub VersionCheck
 		next if (!@files);
 
 		debug(__PACKAGE__, $port, "port newver '$port->{newver}'");
+		my $file = FindNewestFile($port, $site, \@files);
+		$file->{host} = $host;
+		$file->{method} = $method;
 
-		$file = FindNewestFile($port, $site, \@files);
+		# preserve old found except for guess file (first match win)
+		$old_found = $file if ($file->{oldfound} && (!$old_found ||
+		    $old_found->{method} == METHOD_GUESS));
+		# check new_found is last version (otherwise, first match win)
+		$new_found = $file if ($file->{newfound} && (!$new_found ||
+		    vercompare($file->{version}, $new_found->{version}) ||
+		    ($file->{version} eq $new_found->{version} &&
+		    $new_found->{method} == METHOD_GUESS)));
 
-		$old_found = 1 if $file->{oldfound};
-		$new_found = 1 if $file->{newfound};
-
-		if ($new_found && $file->{version} ne $port->{newver}) {
-			info(0, $k, $host,
-			    "UPDATE $port->{ver} -> $file->{version}");
-			$sths->{portdata_setnewver}->execute(
-				$file->{version},
-				$method,
-				$file->{url},
-				$port->{id}
-			) unless ($settings{precious_data});
-
-		} elsif ($new_found && (
-		    $file->{url} ne $port->{newurl} ||
-		    $method != $port->{method})) {
-			regress($k, $host,
-			    "url $port->{newurl} -> $file->{url}")
-			    if ($file->{url} ne $port->{newurl});
-			regress($k, $host,
-			    "method $port->{method} -> $method")
-			    if ($method != $port->{method});
-			$sths->{portdata_fixnewver}->execute(
-				$method,
-				$file->{url},
-				$port->{id}
-			) unless ($settings{precious_data} ||
-			    !$settings{regress});
-
-		} elsif ($new_found) {
-			info(1, $k, $host, "STILL new, $file->{version}");
-
-		} elsif ($old_found && $port->{method} &&
-		    $method != $port->{method}) {
-			regress($k, $host,
-			    "method $port->{method} -> $method");
-			$sths->{portdata_setmethod}->execute(
-				$method,
-				$port->{id}
-			) unless ($settings{precious_data} ||
-			    !$settings{regress});
-
-		} elsif ($old_found && $port->{method}) {
-			info(1, $k, $host, "STILL old, $port->{ver}");
-
-		} elsif ($old_found) {
-			info(0, $k, $host, "FOUND old, $port->{ver}");
-			$sths->{portdata_setmethod}->execute(
-				$method,
-				$port->{id}
-			) unless ($settings{precious_data});
-		}
-
-		$found = 1 if ($old_found && !$found);
-		$found = 2 if ($new_found);
-		last if ($new_found && $settings{newfound_enable});
-		last if ($old_found && $settings{oldfound_enable});
+		# stop sooner except for METHOD_GUESS
+		debug(__PACKAGE__, $port, "newfound enable, stop")
+		    if ($file->{newfound} && $method != METHOD_GUESS &&
+		    $settings{newfound_enable});
+		last if ($file->{newfound} && $method != METHOD_GUESS &&
+		    $settings{newfound_enable});
+		debug(__PACKAGE__, $port, "oldfound enable, stop")
+		    if ($file->{oldfound} && $settings{oldfound_enable});
+		last if ($file->{oldfound} && $settings{oldfound_enable});
 	}
 
 	# Update checked timestamp
 	$sths->{portdata_setchecked}->execute($port->{id})
-		unless ($settings{precious_data});
+	    unless ($settings{precious_data});
 
-	if ($found != 2 && $port->{newver}) {
-		regress($k, "newver not found($found): "
-		    . "old $port->{ver}, new $port->{newver}, "
-		    . "method $port->{method}");
+	# Record new version found
+	if ($new_found && $new_found->{version} ne $port->{newver}) {
+		info(0, $k, $new_found->{host},
+		    "UPDATE $port->{ver} -> $new_found->{version}");
+		$sths->{portdata_setnewver}->execute(
+		    $new_found->{version},
+		    $new_found->{method},
+		    $new_found->{url},
+		    $port->{id}
+		) unless ($settings{precious_data});
+	} elsif ($new_found && (
+	    $new_found->{url} ne $port->{newurl} ||
+	    $new_found->{method} != $port->{method})) {
+		regress($k, $new_found->{host},
+		    "url $port->{newurl} -> $new_found->{url}")
+		    if ($new_found->{url} ne $port->{newurl});
+		regress($k, $new_found->{host},
+		    "method $port->{method} -> $new_found->{method}")
+		    if ($new_found->{method} != $port->{method});
+		$sths->{portdata_fixnewver}->execute(
+		    $new_found->{method},
+		    $new_found->{url},
+		    $port->{id}
+		) unless ($settings{precious_data} ||
+		    !$settings{regress});
+		info(1, $k, $new_found->{host},
+		    "STILL new, $new_found->{version}");
+	} elsif ($new_found) {
+		info(1, $k, $new_found->{host},
+		    "STILL new, $new_found->{version}");
+
+	# Record old version found
+	} elsif ($old_found && $port->{method} &&
+	    $old_found->{method} != $port->{method}) {
+		regress($k, $old_found->{host},
+		    "method $port->{method} -> $old_found->{method}");
+		$sths->{portdata_setmethod}->execute(
+		    $old_found->{method},
+		    $port->{id}
+		) unless ($settings{precious_data} ||
+		    !$settings{regress});
+		info(1, $k, $old_found->{host}, "STILL old, $port->{ver}");
+	} elsif ($old_found && $port->{method}) {
+		info(1, $k, $old_found->{host}, "STILL old, $port->{ver}");
+	} elsif ($old_found) {
+		info(0, $k, $old_found->{host}, "FOUND old, $port->{ver}");
+		$sths->{portdata_setmethod}->execute(
+		    $old_found->{method},
+		    $port->{id}
+		) unless ($settings{precious_data});
+	}
+
+VERSIONCHECK_REGRESS:
+	# Detect new/old found regression
+	if (!$new_found && !$old_found && $port->{newver}) {
+		regress($k, "lost: old $port->{ver}, new $port->{newver}, "
+		    . "method $port->{method}, url $port->{newurl}");
 		$sths->{portdata_resetnewver}->execute(
 			$port->{id}
 		) unless ($settings{precious_data} ||
 		    !$settings{regress});
 		return;
-	} elsif (!$found && $port->{method}) {
+	} elsif (!$new_found && $port->{newver}) {
+		regress($k, "not new: old $port->{ver}, new $port->{newver}, "
+		    . "method $port->{method}, url $port->{newurl}");
+		$sths->{portdata_resetnewver}->execute(
+			$port->{id}
+		) unless ($settings{precious_data} ||
+		    !$settings{regress});
+		return;
+	} elsif (!$new_found && !$old_found && $port->{method}) {
 		regress($k, "not found: old $port->{ver}, "
 		    . "method $port->{method}");
 		$sths->{portdata_setmethod}->execute(
@@ -749,7 +901,9 @@ sub VersionCheck
 		return;
 	}
 
-	if (!$found) {
+	if (!$i) {
+		info(0, $k, "*** skip: $port->{ver}, no proper site");
+	} elsif (!$new_found && !$old_found) {
 		info(0, $k, "*** not found: $port->{ver}");
 	} else {
 		info(1, $k, 'Done');
