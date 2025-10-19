@@ -364,6 +364,13 @@ sub nametoregex
 	my $name = shift;
 	my $regex;
 
+	# XXX skip xorg, xfce, xfce4, asterisk
+	return if ($name eq "xorg");
+	return if ($name eq "xfce");
+	return if ($name eq "xfce4");
+	return if ($name eq "asterisk");
+
+	# XXX whats ^g$ for ?
 	return lc $name if ($name =~ /^($lang_regex|g)$/i);
 
 	if ($name =~ /\//) {
@@ -379,7 +386,7 @@ sub nametoregex
 	$regex =~ s/[\.\-\_]/.?/g;
 	$regex =~ s/^($lang_regex)/(?:$1)?\[\\-\\_\]?/i;
 	$regex =~ s/^g/(?:g)?/i; # note, G for gnu ports: gtar -> tar
-	# debug(__PACKAGE__, undef, "$name -> $regex");
+	#debug(__PACKAGE__, undef, "$name -> $regex");
 
 	return $regex unless ($name =~ /\-|\_|\+|\d|[A-Z]/);
 
@@ -397,7 +404,7 @@ sub nametoregex
 	return $regex unless (scalar @names > 1);
 
 	foreach my $subname (@names) {
-		# debug(__PACKAGE__, undef, "subname $subname");
+		#debug(__PACKAGE__, undef, "subname $subname");
 		# skip if empty (consecutive delimiter)
 		next unless ($subname);
 		if ($subname eq "p5") {
