@@ -1,5 +1,7 @@
 #------------------------------------------------------------------------------
+# Copyright (C) 2005-2011, Shaun Amott. All rights reserved.
 # Copyright (C) 2015,2020 Jasper Lievisse Adriaanse <jasper@openbsd.org>
+# Copyright (C) 2025 Fabien Romano <fabien@openbsd.org>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -68,11 +70,12 @@ sub CanHandle
 
 #------------------------------------------------------------------------------
 # Func: GetFiles()
-# Desc: Extract a list of files from the given URL. Simply query the API.
+# Desc: Extract a list of files from the given URL.
 #
-# Args: $url     - URL we would normally fetch from.
-#       \%port   - Port hash fetched from database.
-#       \@files  - Array to put files into.
+# Args: $url      - URL we would normally fetch from.
+#       \%port    - Port hash fetched from database.
+#       \@files   - Array to put files into.
+#       $path_ver - Version found in url, upper directory to inspect.
 #
 # Retn: $success - False if file list could not be constructed; else, true.
 #------------------------------------------------------------------------------
@@ -81,7 +84,7 @@ sub GetFiles
 {
 	my $self = shift;
 
-	my ($url, $port, $files, $path_ver, $curr_v) = @_;
+	my ($url, $port, $files, $path_ver) = @_;
 
 	my ($ua, $resp, $old_v, $sufx, $guess_v, $distfile, %headers);
 	my $bad_mimetypes = 'html|text|css|pdf|jpeg|gif|png|image|mpeg|bitmap';
@@ -91,8 +94,7 @@ sub GetFiles
 	$old_v = quotemeta $port->{ver};
 	$sufx = quotemeta $port->{sufx};
 
-	# XXX $port->{newver} ? $port->{newver} : $port->{ver}
-	foreach (verguess($curr_v, $port->{limitwhich})) {
+	foreach (verguess($port->{ver}, $port->{limitwhich})) {
 		$guess_v = $_;
 
 		# Only change major version if port isn't
