@@ -120,23 +120,35 @@ my %want_regex = (
 
 # XXX vercompare handle long months but not date_regex
 @months = (
-	qr/Jan(?:uary)?/,
-	qr/Feb(?:ruary)?/,
-	qr/Mar(?:ch)?/,
-	qr/Apr(?:il)?/,
-	qr/May/,
-	qr/Jun(?:e)?/,
-	qr/Jul(?:y)?/,
-	qr/Aug(?:ust)?/,
-	qr/Sep(?:tember)?/,
-	qr/Oct(?:ober)?/,
-	qr/Nov(?:ember)?/,
-	qr/Dec(?:ember)?/
+	qr/jan(?:uary)?/,
+	qr/feb(?:ruary)?/,
+	qr/mar(?:ch)?/,
+	qr/apr(?:il)?/,
+	qr/may/,
+	qr/jun(?:e)?/,
+	qr/jul(?:y)?/,
+	qr/aug(?:ust)?/,
+	qr/sep(?:tember)?/,
+	qr/oct(?:ober)?/,
+	qr/nov(?:ember)?/,
+	qr/dec(?:ember)?/
 );
 
-$month_regex = qr/jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/;
-$date_regex  = qr/(?<!\d)\d{2,4}([\.\-\_]?)
-    (?:\d{2}|$month_regex)\1\d{2,4}(?!\d)/x;
+$month_regex = qr/
+	jan(?:uary)?|
+	feb(?:ruary)?|
+	mar(?:ch)?|
+	apr(?:il)?|
+	may|
+	jun(?:e)?|
+	jul(?:y)?|
+	aug(?:ust)?|
+	sep(?:tember)?|
+	oct(?:ober)?|
+	nov(?:ember)?|
+	dec(?:ember)?/x;
+$date_regex  = qr/(?<!\d)(?:\d{2,4})?(?<SEP>[\.\-\_]?)
+    (?:\d{2}|$month_regex)\k<SEP>\d{2,4}(?!\d)/x;
 
 %beta_types = (
 	snapshot   => { re => 'svn|cvs|snap(?:shot)?|nightly',	rank => 1 },
@@ -770,7 +782,7 @@ sub vercompare
 	if ($new =~ /$month_regex/) {
 		my $i = 1;
 		foreach my $m (@months) {
-			$new =~ s/$m/sprintf "%02d", $i/gie;
+			$new =~ s/$m/sprintf "%02d", $i/ge;
 			$i++;
 		}
 	}
@@ -778,7 +790,7 @@ sub vercompare
 	if ($old =~ /$month_regex/) {
 		my $i = 1;
 		foreach my $m (@months) {
-			$old =~ s/$m/sprintf "%02d", $i/gie;
+			$old =~ s/$m/sprintf "%02d", $i/ge;
 			$i++;
 		}
 	}
