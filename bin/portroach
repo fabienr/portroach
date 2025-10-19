@@ -777,63 +777,88 @@ sub FindNewestFile
 {
 	my ($port, $site, $files) = @_;
 
-	my ($poss_match, $poss_url, $old_found, $new_found);
+	my ($distfile, $distfile_q, $sufx, $oldv_q, $path_q, $nobeta, $old_v,
+	    $poss_match, $poss_url, $old_found, $new_found);
 
-	my $distfile = $port->{distfiles};
-	my $distfile_q = lc $distfile;
-	my $old_vq = vertoregex($port->{ver});# lazy version separator X.Y ~ XY
-	if ($distfile_q =~ s/^(.*)(?:$verprfx_regex?)*$old_vq(.*)$/$1##v##$2/) {
+	$distfile = $port->{distfiles};
+	$distfile_q = lc $distfile;
+
+	if ($port->{sufx} =~ /(\.($archive_regex))+$/) {
+		$sufx = qr/(\.($archive_regex))+/;
+		debug(__PACKAGE__, $port, "trim archive .ext -> $distfile_q")
+		    if ($distfile_q =~ s/$sufx$//);
+	}
+	$oldv_q = vertoregex($port->{ver});# lazy version separator X.Y ~ XY
+	if ($distfile_q =~ s/^(.*)(?:$verprfx_regex?)*$oldv_q(.*)$/$1##v##$2/) {
 		$distfile_q = vertoregex($distfile_q);
 		$distfile_q =~ s/##v##/(?:$verprfx_regex)?(\\d.*?)/;
+		if ($sufx) {
+			$distfile_q .= $sufx;
+		}
 		debug(__PACKAGE__, $port, "distfile regex query, "
 		    . "$distfile -> $distfile_q");
 	} else {
-		debug(__PACKAGE__, $port, "invalid distfile $distfile, "
-		    . "version ($verprfx_regex)?$old_vq not found.");
-		$distfile_q = undef;
+		debug(__PACKAGE__, $port, "invalid distfile regex query, "
+		    . "$distfile -> $distfile_q !~ $oldv_q");
+		undef $distfile_q;
+		$path_q = lc $site;
+		$path_q =~ s/^(https?:\/\/[^\/]+)\/?(.*|$)/\/$2/;
+		if ($path_q =~
+		    s/^(.*)(?:$verprfx_regex?)*$oldv_q(.*)$/$1##v##$2/) {
+			$path_q = vertoregex($path_q);
+			$path_q =~ s/##v##/(?:$verprfx_regex)?(\\d.*?)/;
+			debug(__PACKAGE__, $port, "site regex query, "
+			    . "$site -> $path_q");
+		} else {
+			debug(__PACKAGE__, $port, "invalid "
+			    . "site / distfile $site / $distfile, "
+			    . "version ($verprfx_regex)?$oldv_q not found.");
+			undef $path_q;
+		}
 	}
+	# do not allow beta file if port isn't a beta version AND
+	# there isn't only one file to compare with (latest from site handlers).
+	$nobeta = (!isbeta($port->{ver}) && !isbeta($port->{distname}) &&
+	    $port->{skipbeta} && scalar @$files > 1);
+	debug(__PACKAGE__, $port, "allow beta, version $port->{ver}")
+	    if (isbeta($port->{ver}));
+	debug(__PACKAGE__, $port, "allow beta, distname $port->{distname}")
+	    if (isbeta($port->{distname}));
+	debug(__PACKAGE__, $port, "allow beta, config $port->{skipbeta}")
+	    unless ($port->{skipbeta});
+	debug(__PACKAGE__, $port, "allow beta, unique file")
+	    unless (scalar @$files > 1);
+	$old_v = $port->{ver};
 
 	foreach my $file (@$files)
 	{
-		my ($old_v, $new_v, $poss_path);
-		$old_v = $port->{ver};
+		my ($filename, $new_v, $path, $host);
 
-		if ($file =~ /^(.*)\/(.*?)$/) {
+		if ($file =~ /^(.*\/)(.*?)$/) {
 			# Files from SiteHandlers can come with url/paths;
-			# we're only handling absolute paths and url (later on)
-			$poss_path = $1;
+			# we're only handling absolute path and url
+			$path = $1;
 			$file = $2;
+			if ($path =~ /^((?:https?|ftp):\/\/[^\/]+)(\/.*$|$)/) {
+				$host = $1;
+				$path = $2;
+				$path = '/' unless ($path);
+			}
+			# XXX make sure we got an absolute path
+			# warn & fix at a better place ?
+			$path = '/' . $path if ($path !~ /^\//);
 			debug(__PACKAGE__, $port, "path detected, split: "
-			    . "path $poss_path, file $file");
+			    . "host $host, path $path, file $file");
 		} else {
-			$poss_path = '';
+			undef $path;
 		}
-
-		# Skip beta versions if requested
-		if ($port->{skipbeta} && isbeta($file) && !isbeta($distfile)) {
-			debug(__PACKAGE__, $port, "skip beta $file");
-			next;
-		}
-
-		# Weed out some bad matches
-		# XXX the following distfile_q filter should prevent such wrong
-		# filename going through ... maybe drop this
-		my $skip = 0;
-		foreach (@bad_versions) {
-			last if (!$settings{freebsdhacks_enable});
-			next unless ($file =~ /$_/i && $distfile !~ /$_/i);
-			debug(__PACKAGE__, $port, "skip $file, bad $_");
-			$skip = 1;
-			last;
-		}
-		next if ($skip);
 
 		# Version already know from <url>%%<ver> string
 		if ($file =~ /%%/) {
 			$new_v = lc $file;
 			$new_v =~ s/^.*%%//;
 			$file =~ s/%%.*$//;
-			debug(__PACKAGE__, $port, "new version ? $new_v");
+			#debug(__PACKAGE__, $port, "new version ? '$new_v'");
 
 			if ($new_v eq $port->{ver}) {
 				debug(__PACKAGE__, $port, "old found: "
@@ -850,29 +875,86 @@ sub FindNewestFile
 			}
 		}
 
-		# Version extraction from filename
-		if ($distfile_q && !$new_v &&
-		    $file =~ /^($distfile_q)$/i && $2) {
-			my $ver = $2;
-			debug(__PACKAGE__, $port, "new file ? $file");
-			$new_v = lc $ver;
+		# Weed out some bad matches
+		my $skip = 0;
+		foreach (@bad_versions) {
+			last if (!$settings{freebsdhacks_enable});
+			next unless ($file =~ /$_/i && $distfile !~ /$_/i);
+			debug(__PACKAGE__, $port, "skip $file, bad $_");
+			$skip = 1;
+			last;
+		}
+		next if ($skip);
 
-			# Version is much longer than original - skip it
-			if (length $new_v > (12 + length $old_v)) {
-				debug(__PACKAGE__, $port,
-				    "skip, $new_v > 12 + $old_v");
-				next;
-			}
+		# Handle link with different filename
+		if ($file =~ /__/) {
+			$filename = $file;
+			$filename =~ s/^.*__//;
+			$file =~ s/__.*$//;
+		} else {
+			$filename = $file;
+		}
 
-			debug(__PACKAGE__, $port,
-			    "file $file =~ $distfile && $ver -> $new_v");
-		} elsif (!$new_v) {
-			debug(__PACKAGE__, $port,
-			    "discard, file $file !~ $distfile ($distfile_q)");
+		# Skip beta versions if requested
+		# XXX beta marker in path ? (ex: lang/mono, archivers/unzip)
+		# XXX duplicate with beta check on version !
+		if ($nobeta && isbeta($filename)) {
+			debug(__PACKAGE__, $port, "skip beta file $filename");
 			next;
 		}
 
-		# XXX same distfile / version extraction from path ?
+		# Version extraction from filename
+		if ($distfile_q && !$new_v &&
+		    $filename =~ /^($distfile_q)$/i && $2) {
+			my $ver = $2;
+			$new_v = lc $ver;
+			# Version is much longer than original - skip it
+			if (length $new_v > (10 + length $old_v)) {
+				debug(__PACKAGE__, $port,
+				    "skip, $new_v > 10 + $old_v");
+				next;
+			}
+			debug(__PACKAGE__, $port,
+			    "file $filename =~ $distfile -> $new_v");
+
+		# Version extraction from path
+		# XXX experimental, need more tests
+		# Atm we mostly check path against pkgver, see BuildPort()
+		} elsif ($path_q && $path && !$new_v &&
+		    $filename eq $port->{distfiles} &&
+		    $path =~ /^($path_q)$/i && $2) {
+			my $ver = $2;
+			debug(__PACKAGE__, $port, "new file ? $path");
+			$new_v = lc $ver;
+			# Version is much longer than original - skip it
+			if (length $new_v > (10 + length $old_v)) {
+				debug(__PACKAGE__, $port,
+				    "skip, $new_v > 10 + $old_v");
+				next;
+			}
+			debug(__PACKAGE__, $port,
+			    "path $path =~ $path_q && $ver -> $new_v");
+
+		} elsif (!$new_v) {
+			debug(__PACKAGE__, $port, "discard "
+			    . "file $filename !~ $distfile") if ($distfile_q);
+			if ($path_q && $filename eq $port->{distfiles}) {
+				debug(__PACKAGE__, $port, "discard "
+				    . "path $path !~ $path_q");
+			} elsif ($path_q) {
+				debug(__PACKAGE__, $port, "discard "
+				    . "file $filename != $port->{distfiles}");
+			}
+			next;
+		}
+
+		# Skip beta versions if requested
+		# XXX beta marker in path ? (ex: lang/mono, archivers/unzip)
+		# XXX duplicate with beta check on filename !
+		if ($nobeta && isbeta($new_v)) {
+			debug(__PACKAGE__, $port, "skip beta version $new_v");
+			next;
+		}
 
 		# Normalize \d [-_] \d into \d.\d
 		debug(__PACKAGE__, $port, "normalize new_v -> $new_v")
@@ -880,6 +962,9 @@ sub FindNewestFile
 
 		# Check both version looks the same and are valid
 		unless (isversion($new_v, $old_v)) {
+			debug(__PACKAGE__, $port,
+			    "skip, invalid version $new_v !~ $old_v");
+			next;
 
 			# Detect if version was collapsed into a shorter format
 			my $short_v = $old_v;
@@ -927,15 +1012,15 @@ sub FindNewestFile
 		unless ($settings{sillystrings_enable}) {
 			if ($new_v =~ /[\.\-\_]([A-Za-z]+[A-Za-z_-]{2,})$/) {
 				my $str = $1;
-				debug(__PACKAGE__,$port,"sillystrings $new_v");
+				debug(__PACKAGE__,$port,"silly $str in $new_v");
 				if ($old_v !~ /[\.\-\_]$str$/ && (
 				    $str !~ /^($beta_regex)$/ ||
 				    length $1 < length $str) # short RE match
 				) {
 					debug(__PACKAGE__, $port,
-					    "$old_v !~ [\.\-\_]str");
+					    "$old_v !~ [\.\-\_]$str");
 					debug(__PACKAGE__, $port,
-					    "$str !~ beta_regex")
+					    "$str !~ /^($beta_regex)$/")
 					    if ($str !~ /^($beta_regex)$/);
 					debug(__PACKAGE__, $port,
 					    "length $1 < length $str")
@@ -953,7 +1038,7 @@ sub FindNewestFile
 			next;
 		}
 
-		if (defined $port->{limiteven} and $port->{limitwhich} >= 0) {
+		if (defined $port->{limiteven} && $port->{limitwhich} >= 0) {
 			unless (checkevenodd($new_v,
 			    $port->{limiteven}, $port->{limitwhich})) {
 				debug(__PACKAGE__, $port,
@@ -972,36 +1057,55 @@ sub FindNewestFile
 			$old_found = 1;
 
 		} elsif (vercompare($new_v, $old_v)) {
-			debug(__PACKAGE__, $port, "new found");
+			if (!defined($poss_match)) {
+				debug(__PACKAGE__, $port, "new found");
+			}
 			$new_found = 1;
 
-			# Keep going until we find the newest version
-			if (!defined($poss_match) or
-			    vercompare($new_v, $poss_match)) {
+			# Keep going until we find the newest version and the
+			# filename which match the port sufx
+			if (!defined($poss_match) ||
+			    vercompare($new_v, $poss_match) ||
+			    ($new_v eq $poss_match &&
+			    $poss_url !~ /$port->{sufx}$/ &&
+			    $filename =~ /$port->{sufx}$/)) {
 				$poss_match = $new_v;
 
+				debug(__PACKAGE__, $port, "new found "
+				    . "host $host, path $path, file $file");
+
 				# If custom url or path, use it
-				if ($poss_path =~ /^https?:\/\/[^\/]+\//) {
-					$poss_url = URI->new($poss_path);
+				# we're only handling absolute path and url
+				if ($host) {
+					$poss_url = $host.$path;
+				} elsif ($path) {
+					my $base = $site->clone;
+					$base->path('');
+					$poss_url = $base;
+					$poss_url.= $path;
 				} else {
-					$poss_url = $site->clone;
-					$poss_url->path($poss_path)
-					    if ($poss_path);
+					$poss_url = $site->as_string();
 				}
 
-				# No url if there is no file (%%version)
+				# No url if there is no file (ex: %%version)
 				unless ($file) {
 					$poss_url = "";
 				} else {
-					$poss_url->path($poss_url->path . '/')
-					    if ($poss_url !~ /\/$/);
-					uri_filename($poss_url,
-					    uri_unescape($file));
+					$poss_url .= uri_unescape($file);
+					# XXX not needed
+					#$poss_url->path($poss_url->path . '/')
+					#    if ($poss_url !~ /\/$/);
+					# XXX works with file?query ?
+					#uri_filename($poss_url,
+					#    uri_unescape($file));
 				}
 
-				debug(__PACKAGE__, $port, "last found "
+				debug(__PACKAGE__, $port, "new found "
 				    . "poss $poss_match '$poss_url'");
 				next;
+			} else {
+				debug(__PACKAGE__, $port,
+				    "new $new_v < $poss_match");
 			}
 		} else {
 			debug(__PACKAGE__, $port, "skip $new_v < $old_v");
