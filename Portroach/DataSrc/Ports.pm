@@ -239,6 +239,7 @@ sub BuildPort
 		}
 
 		if ($category eq 'meta') {
+			# XXX check for missplaced meta package ?
 			info(1, $port->{fullpkgpath},
 			    "(".strchop($n,5)."/$tot) SKIP, meta package");
 			$meta++;
@@ -295,8 +296,8 @@ sub BuildPort
 
 		# ports may use encoded url
 		if ((my $file = uri_unescape($distfile)) ne $distfile) {
-			print STDERR "$port->{fullpkgpath}: FIX, encoded url "
-			    . "$distfile -> $file\n";
+			info(1, $port->{fullpkgpath},
+			    "encoded url $distfile -> $file");
 			$distfile = $file;
 		}
 
@@ -308,6 +309,7 @@ sub BuildPort
 		    if ($dist =~ s/(\.($ext_regex))+$//);
 
 		# not much todo without any version, adjust verbosity level
+		# XXX version may be extracted from url path in FindNewestFile()
 		$verbose = 1 if ($dist !~ /$verlike_regex$/i);
 		debug(__PACKAGE__, $port, "verbose($verbose) if "
 		    . "$dist !~ $verlike_regex\$");
@@ -315,11 +317,13 @@ sub BuildPort
 		foreach my $site (split /\s+/, $port->{master_sites}) {
 			my ($canon, $abs_path);
 
-			# ports may use encoded url
-			if ((my $path = uri_unescape($site)) ne $site) {
-				print STDERR "$port->{fullpkgpath}: FIX, ". 
-				    "encoded site $site -> $path\n";
-				$site = $path;
+			# ports may use encoded / in url
+			my $realpath = $site;
+			$realpath =~ s/%2F/\//gi;
+			if ($realpath ne $site) {
+				info(1, $port->{fullpkgpath},
+				    "encoded / in site $site -> $realpath");
+				$site = $realpath;
 			}
 
 			# Sanitize site
