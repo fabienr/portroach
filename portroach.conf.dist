@@ -135,6 +135,7 @@ mastersite ignore+= ,*sizeofvoid.org/pub/OpenBSD/distfiles*
 mastersite ignore+= ,*distfiles.roadrunner.page*
 mastersite ignore+= ,*dickman.org/openbsd/distfiles*
 mastersite ignore+= ,*distfiles.gentoo.org/distfiles*
+mastersite ignore+= ,*ftpmirror.gnu.org*
 
 # Stop checking other site if old/new version are found, default to true
 #oldfound enable =	false
