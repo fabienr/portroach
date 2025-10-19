@@ -1,5 +1,6 @@
 #------------------------------------------------------------------------------
 # Copyright (C) 2014, Jasper Lievisse Adriaanse <jasper@openbsd.org>
+# Copyright (C) 2025 Fabien Romano <fabien@openbsd.org>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -70,8 +71,8 @@ sub CanHandle
 
 	my ($url) = @_;
 
-	my $cpan = '(.*?\/CPAN|[a-z\.]*\.(meta)?(cpan|perl)\.org)';
-	return ($url =~ /(https?|ftp):\/\/$cpan\/modules\//);
+	my $cpan = '(.*?\/CPAN|(.*\.)?(meta)?(cpan|perl)\.org)';
+	return ($url =~ m:(https?|ftp)\://$cpan/(modules|release)/:);
 }
 
 
@@ -80,9 +81,11 @@ sub CanHandle
 # Desc: Extract a list of files from the given URL. Query the MetaCPAN API
 #       for the latest available version of a given module.
 #
-# Args: $url     - URL we would normally fetch from.
-#       \%port   - Port hash fetched from database.
-#       \@files  - Array to put files into.
+# Args: $url       - URL we would normally fetch from.
+#       \%port     - Port hash fetched from database.
+#       \@files    - Array to put files into.
+#       \@sites    - Array to put new site found into.
+#       \@homepages- Array to put new homepage found into.
 #
 # Retn: $success - False if file list could not be constructed; else, true.
 #------------------------------------------------------------------------------
@@ -91,7 +94,7 @@ sub GetFiles
 {
 	my $self = shift;
 
-	my ($url, $port, $files) = @_;
+	my ($url, $port, $files, $sites, $homepages) = @_;
 
 	my ($metacpan, $module, $query, $resp, $ua);
 	$metacpan = 'https://fastapi.metacpan.org/v1/release/';
@@ -108,20 +111,37 @@ sub GetFiles
 	$resp = $ua->request(HTTP::Request->new(GET => $query));
 
 	if ($resp->is_success) {
-	    my $json = decode_json($resp->decoded_content);
-	    if ($json->{timed_out}) {
-	        print STDERR "$port->{fullpkgpath}: $query, CPAN timed_out\n";
-	        return 0;
-	    }
-	    unless ($json->{version}) {
-	        print STDERR "$port->{fullpkgpath}: $query, CPAN no version\n";
-	        return 0;
-	    }
-	    push(@$files, $json->{download_url});
+		my $json = decode_json($resp->decoded_content);
+		if ($json->{timed_out}) {
+			print STDERR
+			    "$port->{fullpkgpath}: $query, CPAN timed_out\n";
+			return 0;
+		}
+		unless ($json->{version}) {
+			print STDERR
+			    "$port->{fullpkgpath}: $query, CPAN no version\n";
+			return 0;
+		}
+		if ($json->{resources}{repository}{web}) {
+			push(@$sites, $json->{resources}{repository}{web});
+			info(1, $port->{fullpkgpath}, "push repo web " .
+			    $json->{resources}{repository}{web});
+		}
+		if ($json->{resources}{repository}{url}) {
+			push(@$sites, $json->{resources}{repository}{url});
+			info(1, $port->{fullpkgpath}, "push repo url " .
+			    $json->{resources}{repository}{url});
+		}
+		if ($json->{resources}{homepage}) {
+			push(@$homepages, $json->{resources}{homepage});
+			info(1, $port->{fullpkgpath}, "push homepage " .
+			    $json->{resources}{homepage});
+		}
+		push(@$files, $json->{download_url});
 	} else {
-	    info(1, $port->{fullpkgpath}, strchop($query, 60)
-	        . ': ' . $resp->status_line);
-	    return 0;
+		info(1, $port->{fullpkgpath}, strchop($query, 60)
+		    . ': ' . $resp->status_line);
+		return 0;
 	}
 
 	return 1;
