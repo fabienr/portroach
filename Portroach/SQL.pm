@@ -93,14 +93,14 @@ $sql{create_view} = q(CREATE TEMP VIEW RoachData AS
 	    PORTROACH as portroach,
 	    PORTROACH_COMMENT as portroach_comment,
 	    HOMEPAGE as homepage,
-	    FULLPKGNAME as fullpkgname
+	    FULLPKGNAME as name
 	FROM portsq
 	ORDER BY fullpkgpath);
 
 $sql{ports_select} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-	     portroach_comment, homepage, fullpkgname
+             portroach_comment, homepage, name
         FROM RoachData);
 
 $sql{ports_select_count} =
@@ -122,7 +122,7 @@ $sql{ports_restrict_site_count} =
 $sql{ports_restrict_maintainer} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage, fullpkgname
+             portroach_comment, homepage, name
         FROM RoachData
        WHERE maintainer like ?);
 
@@ -134,7 +134,7 @@ $sql{ports_restrict_maintainer_count} =
 $sql{ports_restrict_category} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage, fullpkgname
+             portroach_comment, homepage, name
         FROM RoachData
        WHERE categories like ?);
 
@@ -146,7 +146,7 @@ $sql{ports_restrict_category_count} =
 $sql{ports_restrict_port} =
     q(SELECT fullpkgpath, categories, distname, distfiles,
              master_sites, maintainer, comment, portroach,
-             portroach_comment, homepage, fullpkgname
+             portroach_comment, homepage, name
         FROM RoachData
        WHERE fullpkgpath like ?);
 

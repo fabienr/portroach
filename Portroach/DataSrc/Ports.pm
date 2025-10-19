@@ -402,11 +402,11 @@ sub BuildPort
 			$verbose = 1;
 		}
 
-		debug(__PACKAGE__, $port, "pkg $port->{fullpkgname}: "
+		debug(__PACKAGE__, $port, "pkg $port->{name}: "
 		    . "distfile $distfile, distname $port->{distname}");
 		
 		# Shortcut, check pkg version against distfile
-		$pkgver = $port->{fullpkgname};
+		$pkgver = $port->{name};
 		$pkgver = lc $pkgver;
 		debug(__PACKAGE__, $port, "flavor -> $pkgver")
 		    if ($pkgver =~ s/(\-\D[^\-]*)+$//g);
@@ -516,7 +516,7 @@ sub BuildPort
 		}
 
 		unless ($ver) {
-			$ver = $versrc = $port->{fullpkgname};
+			$ver = $versrc = $port->{name};
 			$ver = lc $ver;
 			$ver =~ s/(\-\D[^\-]*)+$//g;
 			$ver =~ s/^(.*)-([^-]*)$/$2/g;
@@ -537,7 +537,7 @@ sub BuildPort
 		debug(__PACKAGE__, $port, "$versrc -> $ver");
 
 		my $rc = $ps->AddPort({
-		    'name'        => $port->{fullpkgname},
+		    'name'        => $port->{name},
 		    'cat'         => $category,
 		    'ver'         => $ver,
 		    'maintainer'  => $port->{maintainer},
