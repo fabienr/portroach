@@ -32,8 +32,6 @@ use base qw(Portroach::DataSrc);
 
 use File::stat;
 
-use List::MoreUtils qw(uniq);
-
 use URI;
 use URI::Escape;
 
@@ -144,8 +142,8 @@ sub BuildDB
 sub BuildPort
 {
 	my ($ps, $sdbh) = @_;
-	my ($port, $q, $tot, $n, $rej, $meta, $dup, $bump, $up, $new);
-	$n = $rej = $meta = $dup = $bump = $up = $new = 0;
+	my ($port, $q, $tot, $n, $skip, $meta, $rej, $dup, $bump, $up, $new);
+	$n = $skip = $meta = $rej = $dup = $bump = $up = $new = 0;
 
 	my $sths = {};
 	prepare_sql($sdbh, $sths, qw(
@@ -239,7 +237,7 @@ sub BuildPort
 		if (!$port->{distfiles}) {
 			info(0, $port->{fullpkgpath},
 			    "(".strchop($n,5)."/$tot) SKIP, no distfile");
-			$rej++;
+			$skip++;
 			next;
 		}
 
@@ -346,7 +344,7 @@ sub BuildPort
 				    . "caught error on $site\n";
 				debug(__PACKAGE__, $port, "$_");
 			};
-			next unless($canon);
+			next unless ($canon);
 
 			# Check if path is absolute (../ ./ //)
 			# XXX verbose, looks cosmetic
@@ -442,18 +440,18 @@ sub BuildPort
 
 				debug(__PACKAGE__, $port, "chop\$ -> $ver")
 				    if ($ver =~ s/($chop_sufxq|[\.\-\_]?
-				        ($dist_q))+$//xg);
+				    ($dist_q))+$//xg);
 			}
 
 			# shortcut, most common cases
 			if (isversion($ver)) {
-				# Normalize \d [-_] \d into \d.\d
+				# Normalize \d[-_]\d into \d.\d
 				debug(__PACKAGE__, $port, "normalize -> $ver")
 				    if ($ver =~ s/(?<=\d)[\-\_](?=\d)/\./g);
 				last;
 			}
 
-			# Remove names from pkgname/fullpkgpath, prefix & suffix
+			# Remove names from port, prefix & suffix
 			# Note, allow some extra garbage \d(?!\.) | \++
 			debug(__PACKAGE__,$port,"~$dist_q~ SEP -> $ver")
 			    if ($ver =~ s/^(\D*?($chop_prfxq|$dist_q)
@@ -467,7 +465,7 @@ sub BuildPort
 			    if ($ver =~ s/^\D*?(?:$dist_q)(?:$chop_prfxq)?
 			    (?:$verprfx_regex?)?($verlike_regex)$/$1/x);
 
-			# Chop prefix after name's query
+			# Chop prefix after dist name's query
 			debug(__PACKAGE__, $port, "^chop -> $ver")
 			    if ($ver =~ s/^(\D*?$chop_prfxq)+//g);
 
@@ -480,6 +478,7 @@ sub BuildPort
 			    if ($ver =~ s/(?<=\d)[\-\_](?=\d)/\./g);
 
 			# Check commit id string to reduce verbosity on those
+			# XXX check for go 0.0.0.date.commitid string ?
 			# XXX WIP, tmp verbose adjustment to ease dev/debug
 			if ($ver =~ /^[0-9a-f]{10,40}$/) {
 				$verbose = 1;
@@ -560,8 +559,8 @@ sub BuildPort
 			    "(".strchop($n,5)."/$tot) NEW, $ver");
 		}
 	}
-	print "($tot) Build done: new $new, up. $up, "
-	    . "bump(ver) $bump / rej. $rej, meta $meta, dup. $dup\n";
+	print "($tot) Build done: meta $meta, skip $skip, rej. $rej, "
+	    . "dup. $dup, bump $bump, up. $up, new $new \n";
 	return $rc;
 }
 
