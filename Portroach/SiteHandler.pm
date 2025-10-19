@@ -31,6 +31,7 @@ use Portroach::SiteHandler::Bitbucket;
 use Portroach::SiteHandler::Codeberg;
 use Portroach::SiteHandler::CPAN;
 use Portroach::SiteHandler::GitHub;
+use Portroach::SiteHandler::GitLab;
 use Portroach::SiteHandler::Go;
 use Portroach::SiteHandler::Hackage;
 use Portroach::SiteHandler::Launchpad;
