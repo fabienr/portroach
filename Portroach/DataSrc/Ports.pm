@@ -156,8 +156,10 @@ sub BuildPort
 	# Patterns to remove common suffix/prefix
 	my $chop_regex = $settings{build_chop};
 	my $chop_sufxq = qr/[\.\-\_\+]?(?:$chop_regex|$lang_regex)[\.\-\_\+]?/;
-	my $chop_prfxq = qr/[\.\-\_\+]?
-	    (?:$chop_regex|$lang_regex|$beta_regex)[\.\-\_\+]?/x;
+	# XXX too agressive with new beta re ?
+	#my $chop_prfxq = qr/[\.\-\_\+]?
+	#    (?:$chop_regex|$lang_regex|$beta_regex)[\.\-\_\+]?/x;
+	my $chop_prfxq = $chop_sufxq;
 
 	# Apply any needed restrictions.
 	my $rc = 0; # report success only if not restricted
@@ -306,7 +308,7 @@ sub BuildPort
 		    unless ($sufx = extractsuffix($distfile));
 		$dist = $distfile;
 		debug(__PACKAGE__, $port, "trim .ext -> $dist")
-		    if ($dist =~ s/(\.($ext_regex))+$//);
+		    if ($dist =~ s/$ext_regex//);
 
 		# not much todo without any version, adjust verbosity level
 		# XXX version may be extracted from url path in FindNewestFile()
@@ -387,6 +389,8 @@ sub BuildPort
 
 			# Extract from site handler, override dist
 			if ($ver = Portroach::SiteHandler->FindVersion($site)) {
+				# multi-versions : v0/v1/v2 -> v0+v1+v2
+				$ver =~ s/\//\+/g;
 				$dist = $ver;
 				debug(__PACKAGE__, $port, "$site -> $dist");
 			}
@@ -438,10 +442,10 @@ sub BuildPort
 			# Alway start with lower case to ease further processing
 			$ver = lc $ver;
 
-			# Version check againt SITE, handle only one /Version/
-			if ($ver =~ s:^.*/($verlike_regex)/.*$:$1:) {
+			# Version check against SITE, handle only one /Version/
+			if ($ver =~ s:^.*/($verlike_regex)(/.*)?$:$1:) {
 				debug(__PACKAGE__,$port,"path version -> $ver");
-			} elsif (index($ver,"/") != -1) {
+			} elsif (index($ver, "/") != -1) {
 				# Still a path, no version found, next
 				debug(__PACKAGE__, $port,
 				    "invalid path, skip $ver");
@@ -483,7 +487,7 @@ sub BuildPort
 
 			# Chop prefix after dist name's query
 			debug(__PACKAGE__, $port, "^chop -> $ver")
-			    if ($ver =~ s/^(\D*?$chop_prfxq)+//g);
+			    if ($ver =~ s/^(\D*$chop_prfxq)+//g);
 
 			# Remove common prefix version marker
 			debug(__PACKAGE__, $port, "trim (v|r) -> $ver")
