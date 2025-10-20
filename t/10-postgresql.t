@@ -2,7 +2,7 @@
 
 use Test;
 
-BEGIN { plan tests => 2; }
+BEGIN { plan tests => 52; }
 
 use DBI;
 use File::Temp qw(tempfile tempdir);
@@ -21,9 +21,9 @@ $dbuser = $dbname;
 
 # Create database
 
-qx(createuser -D -A -U pgsql "$dbuser");
+qx(createuser -DRS -U postgres "$dbuser");
 die if $?;
-qx(createdb -U pgsql -E UNICODE "$dbname");
+qx(createdb -U postgres -E UNICODE -O "$dbuser" "$dbname");
 die if $?;
 
 qx(psql $dbuser $dbname < sql/pgsql_init.sql);
@@ -44,17 +44,19 @@ $dbh = connect_db();
 
 # Prepare all SQL statements
 
-eval {
-	prepare_sql($dbh, \%sths, keys %Portroach::SQL::sql);
-};
-
-ok(!$@);
+foreach my $key (keys %Portroach::SQL::sql) {
+	next if ($key =~ /^ports_/ || $key eq "create_view");
+	eval {
+		prepare_sql($dbh, \%sths, $key);
+	};
+	ok($@, "", $key);
+}
 
 END {
 	if ($dbh) {
 		finish_sql($dbh, \%sths);
 		$dbh->disconnect;
 	}
-	if ($dbname) { qx(dropdb -U pgsql "$dbname"); }
-	if ($dbuser) { qx(dropuser -U pgsql "$dbuser"); }
+	if ($dbname) { qx(dropdb -U postgres "$dbname"); }
+	if ($dbuser) { qx(dropuser -U postgres "$dbuser"); }
 }

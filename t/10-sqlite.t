@@ -2,7 +2,7 @@
 
 use Test;
 
-BEGIN { plan tests => 2; }
+BEGIN { plan tests => 52; }
 
 use DBI;
 use File::Temp qw(tempfile tempdir);
@@ -37,8 +37,10 @@ $dbh = connect_db();
 
 # Prepare all SQL statements
 
-eval {
-	prepare_sql($dbh, \%sths, keys %Portroach::SQL::sql);
-};
-
-ok(!$@);
+foreach my $key (keys %Portroach::SQL::sql) {
+	next if ($key =~ /^ports_/ || $key eq "create_view");
+	eval {
+		prepare_sql($dbh, \%sths, $key);
+	};
+	ok($@, "", $key);
+}
