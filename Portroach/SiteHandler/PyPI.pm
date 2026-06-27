@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 # Copyright (C) 2015, Jasper Lievisse Adriaanse <jasper@openbsd.org>
-# Copyright (C) 2025 Fabien Romano <fabien@openbsd.org>
+# Copyright (C) 2026, Fabien Romano <fabien@openbsd.org>
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -78,9 +78,11 @@ sub CanHandle
 # Func: GetFiles()
 # Desc: Extract a list of files from the given URL. Simply query the API.
 #
-# Args: $url     - URL we would normally fetch from.
-#       \%port   - Port hash fetched from database.
-#       \@files  - Array to put files into.
+# Args: $url       - URL we would normally fetch from.
+#       \%port     - Port hash fetched from database.
+#       \@files    - Array to put files into.
+#       \@sites    - Array to put new site found into.
+#       \@homepages- Array to put new homepage found into.
 #
 # Retn: $success - False if file list could not be constructed; else, true.
 #------------------------------------------------------------------------------
@@ -89,7 +91,7 @@ sub GetFiles
 {
 	my $self = shift;
 
-	my ($url, $port, $files) = @_;
+	my ($url, $port, $files, $sites, $homepages) = @_;
 
 	my ($pypi, $package, $resp, $query, $ua);
 	$pypi = 'https://pypi.python.org/pypi/';
@@ -111,6 +113,17 @@ sub GetFiles
 		$urls = $json->{urls};
 		foreach my $url (@$urls) {
 			push(@$files, $url->{filename});
+		}
+		if ($json->{info}{home_page}) {
+			push(@$homepages, $json->{info}{home_page});
+			info(1, $port->{fullpkgpath}, "push homepage " .
+			    $json->{info}{home_page});
+		}
+		if ($json->{info}{project_urls}{Homepage}) {
+			push(@$homepages,
+			    $json->{info}{project_urls}{Homepage});
+			info(1, $port->{fullpkgpath}, "push homepage " .
+			    $json->{info}{project_urls}{Homepage});
 		}
 		my @releases = ( keys %{$json->{releases}} );
 		foreach my $version (@releases) {

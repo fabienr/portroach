@@ -37,7 +37,7 @@ package Portroach::SiteHandler;
 #       $path_ver - Version found in url, upper directory to inspect.
 # HttpHomepage
 #       \@checked - Array of site/handler already processed.
-# CPAN, SourceForge
+# CPAN, SourceForge, PyPi
 #       \@sites    - Array to put new site found into.
 #       \@homepages- Array to put new homepage found into.
 # Ideally, the new api could ease FindNewestFile() checks by providing more
