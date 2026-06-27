@@ -6,3 +6,6 @@ Makefile
 *.gz
 *.orig.port
 *.beforesubst
+blib
+MYMETA.*
+pm_to_blib
