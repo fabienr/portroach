@@ -329,6 +329,10 @@ sub AddPort
 				    "use limitver $val != $pcfg{limitver}");
 				$pcfg{pcfg_static} = 0;
 				$pcfg{limitver} = $val;
+			} else {
+				debug(__PACKAGE__, $port, "limitver $val");
+				$pcfg{pcfg_static} = 0;
+				$pcfg{limitver} = $val;
 			}
 			next;
 		}
@@ -384,11 +388,20 @@ sub AddPort
 	$pcfg{ignore} = 0 if !exists($pcfg{ignore});
 	$pcfg{pcfg_static} = 0 if !exists($pcfg{pcfg_static});
 
-	if ($pcfg{limitver} && $port->{ver} !~ /$pcfg{limitver}/) {
-		info(0, $port->{fullpkgpath},
-		    "broken limitver $port->{ver} ~ $pcfg{limitver}");
+	# handle invalid regex
+	try {
+		if ($pcfg{limitver} && $port->{ver} !~ /$pcfg{limitver}/) {
+			info(0, $port->{fullpkgpath},
+			    "broken limitver $port->{ver} ~ $pcfg{limitver}");
+			$pcfg{limitver} = undef;
+		}
+	} catch {
+		print STDERR "$port->{fullpkgpath}: "
+		    . "caught error on re $pcfg{limitver}\n";
+		debug(__PACKAGE__, $port, "$_");
 		$pcfg{limitver} = undef;
-	}
+	};
+
 
 	if (defined $pcfg{limiteven} && $pcfg{limitwhich} >= 0 &&
 	    !checkevenodd($port->{ver}, $pcfg{limiteven}, $pcfg{limitwhich})) {
