@@ -728,6 +728,8 @@ sub VersionCheck
 				$sths->{sitedata_success}->execute($host);
 				$method = METHOD_LIST if (@files);
 			}
+		} elsif ($site->scheme =~ /git?/) {
+			# XXX notyet, not sure how to implement git, cache ?
 		} else {
 			print STDERR "$port->{fullpkgpath}: "
 			    . "unknow sheme from $site.\n";
